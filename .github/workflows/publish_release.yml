@@ -18,13 +18,15 @@ on:
         required: false
         default: 'v'
 
-permissions:
-  contents: write
-
 jobs:
   release:
 
     runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: write
+      attestations: write
 
     steps:
     - uses: actions/checkout@v4
@@ -34,18 +36,14 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         dotnet-version: 8.0.x
-    - name: Restore dependencies
-      run: dotnet restore
-    - name: Build
-      run: dotnet build --no-restore
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
+    - name: Build and Test
+      run: dotnet test --verbosity normal
     - name: Generate Semantic Version
       id: generate_semver
       if: ${{ inputs.version == 'v' && github.event_name == 'workflow_dispatch' }}
       uses: zwaldowski/semver-release-action@v4
       with:
-        github_token: ${{ secrets.GITHUBTOKEN }}
+        github_token: ${{ github.token }}
         bump: patch
         prefix: v
         dry_run: true
@@ -56,6 +54,8 @@ jobs:
         VERSION=${VERSION_TAG//v/}
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "version_tag=$VERSION_TAG" >> $GITHUB_OUTPUT
+
+    # Binaries
     - name: Publish Windows
       run: dotnet publish -r win-x64 /p:Version=${{ steps.set_version.outputs.version }} -o ./publish/win-x64 ./BambuVideoStream
     - name: Publish Linux
@@ -64,11 +64,10 @@ jobs:
       run: dotnet publish -r osx-x64 /p:Version=${{ steps.set_version.outputs.version }} -o ./publish/osx-x64 ./BambuVideoStream
     - name: Publish OSX-ARM
       run: dotnet publish -r osx-arm64 /p:Version=${{ steps.set_version.outputs.version }} -o ./publish/osx-arm64 ./BambuVideoStream
-    # - name: Upload Artifacts
-    #   uses: actions/upload-artifact@v4.3.3
-    #   with:
-    #     # A file, directory or wildcard pattern that describes what to upload
-    #     path: ./publish
+    - name: Generate artifact attestation
+      uses: actions/attest-build-provenance@v1
+      with:
+        subject-path: './publish/**'
     - name: Zip Artifacts
       run: |
         mkdir -p ./release
@@ -76,14 +75,19 @@ jobs:
         tar -czvf ./release/linux-x64.tar.gz ./publish/linux-x64
         tar -czvf ./release/osx-x64.tar.gz ./publish/osx-x64
         tar -czvf ./release/osx-arm64.tar.gz ./publish/osx-arm64
-    - name: Push version tag
-      run: git tag ${{ steps.set_version.outputs.version_tag }} && git push origin ${{ steps.set_version.outputs.version_tag }} || true
+    - name: Generate ZIP attestation
+      uses: actions/attest-build-provenance@v1
+      with:
+        subject-path: './release/*'
+
+    # Release
     - name: Create GitHub Release
       uses: ncipollo/release-action@v1.14.0
       with:
         artifacts: ./release/*
-        token: ${{ secrets.GITHUBTOKEN }}
+        token: ${{ github.token }}
         tag: ${{ steps.set_version.outputs.version_tag }}
+        commit: ${{ github.sha }}
         generateReleaseNotes: true
         draft: ${{ inputs.draft }}
         prerelease: false
