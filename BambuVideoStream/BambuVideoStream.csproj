@@ -7,6 +7,9 @@
     <Nullable>disable</Nullable>
     <UserSecretsId>f76d68f2-da99-4ef8-a6ca-13e366f0334c</UserSecretsId>
     <PublishSingleFile>true</PublishSingleFile>
+    <!-- This setting cannot be enabled, because the FluentFTP.GnuTLS dependency below doesn't know how
+         to find the .dlls when they are packaged into the .exe :( It may be possible w/ hax? -->
+    <!-- <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract> -->
     <SelfContained>true</SelfContained>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <!-- This application will generally be long-running -->
