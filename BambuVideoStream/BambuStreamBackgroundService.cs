@@ -93,7 +93,7 @@ public class BambuStreamBackgroundService : BackgroundService
         this.mqttClient.ApplicationMessageReceivedAsync += this.OnMessageReceived;
         this.mqttClient.DisconnectedAsync += this.MqttClient_DisconnectedAsync;
         this.mqttClientOptions = new MqttClientOptionsBuilder()
-            .WithTcpServer(this.bambuSettings.IpAddress, this.bambuSettings.Port)
+            .WithTcpServer(this.bambuSettings.IpAddress, this.bambuSettings.MqttPort)
             .WithCredentials(this.bambuSettings.Username, this.bambuSettings.Password)
             .WithTlsOptions(new MqttClientTlsOptions
             {

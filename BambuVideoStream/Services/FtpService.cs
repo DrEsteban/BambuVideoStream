@@ -133,7 +133,7 @@ public class FtpService(
             this.settings.IpAddress,
             this.settings.Username,
             this.settings.Password,
-            990,
+            this.settings.FtpPort,
             new FtpConfig
             {
                 LogHost = true,
