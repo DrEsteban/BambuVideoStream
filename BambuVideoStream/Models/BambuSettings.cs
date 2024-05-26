@@ -11,5 +11,5 @@ public class BambuSettings
     public string Username { get; set; }
     public string Password { get; set; }
     public string Serial { get; set; }
-    public string PathToSDP { get; set; } = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "/Roaming/BambuStudio/cameratools/ffmpeg.sdp");
+    public string PathToSDP { get; set; } = Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BambuStudio/cameratools/ffmpeg.sdp");
 }
