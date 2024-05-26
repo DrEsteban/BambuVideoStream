@@ -49,5 +49,11 @@ builder.Services.AddTransient<MyOBSWebsocket>();
 builder.Services.AddHostedService<BambuStreamBackgroundService>();
 
 var host = builder.Build();
+GlobalLogger = host.Services.GetRequiredService<ILogger<Program>>();
 
 await host.RunAsync();
+
+public partial class Program
+{ 
+    internal static ILogger<Program> GlobalLogger { get; private set; }
+}
