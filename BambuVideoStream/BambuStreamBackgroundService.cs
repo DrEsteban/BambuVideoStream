@@ -351,9 +351,10 @@ public class BambuStreamBackgroundService : BackgroundService
                     if (!string.IsNullOrEmpty(p.print.subtask_name) && p.print.subtask_name != this.subtask_name)
                     {
                         this.subtask_name = p.print.subtask_name;
-                        this.DownloadFileImagePreview($"/cache/{this.subtask_name}.3mf");
+                        var fileLocation = this.DetermineFileLocation(this.subtask_name);
+                        this.DownloadFileImagePreview(fileLocation);
 
-                        var weight = this.ftpService.GetPrintJobWeight($"/cache/{this.subtask_name}.3mf");
+                        var weight = this.ftpService.GetPrintJobWeight(fileLocation);
                         obs.UpdateText(this.printWeight, $"{weight}g");
                     }
 
@@ -380,6 +381,22 @@ public class BambuStreamBackgroundService : BackgroundService
         }
 
         return Task.CompletedTask;
+    }
+
+    private string DetermineFileLocation(string subtaskName)
+    {
+        var cacheFileName = $"/cache/{subtaskName}.3mf"; // File was sent via BambuStudio
+        var savedFileName = $"/{subtaskName}.3mf"; // File was saved to the printer
+        if (this.ftpService.FileExists(cacheFileName))
+        {
+            return cacheFileName;
+        }
+        else if (this.ftpService.FileExists(savedFileName))
+        {
+            return savedFileName;
+        }
+
+        return null;
     }
 
     private void DownloadFileImagePreview(string fileName)

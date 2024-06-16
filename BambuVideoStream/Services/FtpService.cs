@@ -6,7 +6,9 @@ using System.Threading;
 using System.Xml.Linq;
 using System.Xml.XPath;
 using BambuVideoStream.Models;
+using BambuVideoStream.Utilities;
 using FluentFTP;
+using FluentFTP.Exceptions;
 using FluentFTP.GnuTLS;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -24,15 +26,15 @@ public class FtpService(
     private readonly BambuSettings settings = options.Value;
     private readonly CancellationToken ct = lifetime.ApplicationStopping;
 
-    public IList<FtpListItem> ListDirectory()
+    /// <exception cref="ObjectDisposedException"></exception>
+    public IList<FtpListItem> ListDirectory(string dir)
     {
         try
         {
             this.ct.ThrowIfCancellationRequested();
 
             using var ftp = this.GetFtpClient();
-            using var _ = this.ct.Register(ftp.Disconnect);
-            var directory = ftp.GetListing("/cache");
+            var directory = ftp.Value.GetListing(dir);
             return directory;
         }
         catch (OperationCanceledException e)
@@ -41,6 +43,24 @@ public class FtpService(
         }
     }
 
+    /// <exception cref="ObjectDisposedException"></exception>
+    public bool FileExists(string filename)
+    {
+        try
+        {
+            this.ct.ThrowIfCancellationRequested();
+
+            using var ftp = this.GetFtpClient();
+            return ftp.Value.FileExists(filename);
+        }
+        catch (OperationCanceledException e)
+        {
+            throw new ObjectDisposedException($"{nameof(FtpService)} is disposed", e);
+        }
+    }
+
+    /// <exception cref="FtpMissingObjectException"></exception>
+    /// <exception cref="ObjectDisposedException"></exception>
     public byte[] GetFileThumbnail(string filename)
     {
         try
@@ -50,11 +70,10 @@ public class FtpService(
             using var file = new MemoryStream();
 
             using (var ftp = this.GetFtpClient())
-            using (this.ct.Register(ftp.Disconnect))
             {
-                if (!ftp.DownloadStream(file, filename))
+                if (!ftp.Value.DownloadStream(file, filename)) // Could also throw FtpMissingObjectException
                 {
-                    throw new FileNotFoundException($"File {filename} not found");
+                    throw new FtpMissingObjectException($"File {filename} not found", new FileNotFoundException(), filename, FtpObjectType.File);
                 }
             }
             
@@ -76,12 +95,19 @@ public class FtpService(
             entryStream.CopyTo(outputStream);
             return outputStream.ToArray();
         }
+        catch (FtpMissingObjectException e)
+        {
+            this.log.LogWarning(e, "Couldn't find file '{filename}'", filename);
+            return null;
+        }
         catch (OperationCanceledException e)
         {
             throw new ObjectDisposedException($"{nameof(FtpService)} is disposed", e);
         }
     }
 
+    /// <exception cref="ObjectDisposedException"></exception>
+    /// <remarks>Swallows (but logs) runtime exceptions other than <see cref="ObjectDisposedException"/></remarks>
     public string GetPrintJobWeight(string filename)
     {
         try
@@ -91,11 +117,10 @@ public class FtpService(
             using var file = new MemoryStream();
 
             using (var ftp = this.GetFtpClient())
-            using (this.ct.Register(ftp.Disconnect))
             {
-                if (!ftp.DownloadStream(file, filename))
+                if (!ftp.Value.DownloadStream(file, filename))
                 {
-                    throw new FileNotFoundException($"File {filename} not found");
+                    throw new FileNotFoundException($"File '{filename}' not found");
                 }
             }
 
@@ -115,6 +140,10 @@ public class FtpService(
             var weight = filamentNode.Attribute("used_g").Value;
             return weight;
         }
+        catch (FtpMissingObjectException)
+        {
+            this.log.LogWarning("Couldn't find file '{filename}'", filename);
+        }
         catch (OperationCanceledException e)
         {
             throw new ObjectDisposedException($"{nameof(FtpService)} is disposed", e);
@@ -127,7 +156,7 @@ public class FtpService(
         return null;
     }
 
-    private FtpClient GetFtpClient()
+    private DisposableObjectHolder<FtpClient> GetFtpClient()
     {
         var ftp = new FtpClient(
             this.settings.IpAddress,
@@ -145,7 +174,10 @@ public class FtpService(
             },
             new FtpLogger(this.log));
         ftp.Connect();
-        return ftp;
+        var holder = new DisposableObjectHolder<FtpClient>(ftp);
+        var reg = this.ct.Register(ftp.Disconnect);
+        holder.Disposing += (_, _) => reg.Dispose();
+        return holder;
     }
 
     private class FtpLogger(ILogger<FtpService> logger) : IFtpLogger
