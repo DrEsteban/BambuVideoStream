@@ -11,6 +11,7 @@ using BambuVideoStream.Models;
 using BambuVideoStream.Models.Mqtt;
 using BambuVideoStream.Models.Wrappers;
 using BambuVideoStream.Services;
+using BambuVideoStream.Utilities;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -352,10 +353,17 @@ public class BambuStreamBackgroundService : BackgroundService
                     {
                         this.subtask_name = p.print.subtask_name;
                         var fileLocation = this.DetermineFileLocation(this.subtask_name);
-                        this.DownloadFileImagePreview(fileLocation);
+                        if (!string.IsNullOrEmpty(fileLocation))
+                        {
+                            this.DownloadFileImagePreview(fileLocation);
 
-                        var weight = this.ftpService.GetPrintJobWeight(fileLocation);
-                        obs.UpdateText(this.printWeight, $"{weight}g");
+                            var weight = this.ftpService.GetPrintJobWeight(fileLocation);
+                            obs.UpdateText(this.printWeight, $"{weight}g");
+                        }
+                        else
+                        {
+                            this.log.LogWarning("Image preview and print weight unavailable.");
+                        }
                     }
 
                     this.CheckStreamStatus(p);
@@ -385,17 +393,20 @@ public class BambuStreamBackgroundService : BackgroundService
 
     private string DetermineFileLocation(string subtaskName)
     {
-        var cacheFileName = $"/cache/{subtaskName}.3mf"; // File was sent via BambuStudio
-        var savedFileName = $"/{subtaskName}.3mf"; // File was saved to the printer
+        var cacheFileName = $"/cache/{subtaskName.Trim()}".EnsureSuffix(".3mf"); // File was sent via BambuStudio
+        var savedFileName = $"/{subtaskName.Trim()}".EnsureSuffix(".3mf"); // File was saved to the printer
         if (this.ftpService.FileExists(cacheFileName))
         {
+            this.log.LogInformation("Found print file at: {cacheFileName}", cacheFileName);
             return cacheFileName;
         }
         else if (this.ftpService.FileExists(savedFileName))
         {
+            this.log.LogInformation("Found print file at: {savedFileName}", savedFileName);
             return savedFileName;
         }
 
+        this.log.LogWarning("Couldn't find location of print file '{subtask_name}.3mf'", subtaskName);
         return null;
     }
 
