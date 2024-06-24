@@ -58,8 +58,10 @@ jobs:
     # Binaries
     - name: Publish Windows
       run: dotnet publish -r win-x64 /p:Version=${{ steps.set_version.outputs.version }} -o ./publish/win-x64 ./BambuVideoStream
-    - name: Publish Linux
+    - name: Publish Linux-x64
       run: dotnet publish -r linux-x64 /p:Version=${{ steps.set_version.outputs.version }} -o ./publish/linux-x64 ./BambuVideoStream
+    - name: Publish Linux-arm64
+      run: dotnet publish -r linux-arm64 /p:Version=${{ steps.set_version.outputs.version }} -o ./publish/linux-arm64 ./BambuVideoStream
     - name: Publish OSX-x64
       run: dotnet publish -r osx-x64 /p:Version=${{ steps.set_version.outputs.version }} -o ./publish/osx-x64 ./BambuVideoStream
     - name: Publish OSX-ARM
@@ -73,6 +75,7 @@ jobs:
         mkdir -p ./release
         zip -r ./release/win-x64.zip ./publish/win-x64
         tar -czvf ./release/linux-x64.tar.gz ./publish/linux-x64
+        tar -czvf ./release/linux-arm64.tar.gz ./publish/linux-arm64
         tar -czvf ./release/osx-x64.tar.gz ./publish/osx-x64
         tar -czvf ./release/osx-arm64.tar.gz ./publish/osx-arm64
     - name: Generate ZIP attestation
@@ -135,6 +138,7 @@ jobs:
       - name: Create Velopack
         run: |
           dotnet tool restore
+          dotnet vpk download github -o "./vpk" --repoUrl "https://github.com/${{ github.repository }}"
           dotnet vpk pack -o "./vpk" -u "DrEsteban.BambuVideoStream" -v "${{ needs.release.outputs.version }}" -p "./publish/publish/win-x64" --mainExe "BambuVideoStream.exe" --packTitle "Bambu Video Stream Tool" --packAuthors "DrEsteban" --skipVeloAppCheck
 
       - name: Generate artifact attestation
