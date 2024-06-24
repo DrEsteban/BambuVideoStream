@@ -132,7 +132,7 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Upload Velopack
+      - name: Create Velopack
         run: |
           dotnet tool restore
           dotnet vpk pack -o "./vpk" -u "DrEsteban.BambuVideoStream" -v "${{ needs.release.outputs.version }}" -p "./publish/publish/win-x64" --mainExe "BambuVideoStream.exe" --packTitle "Bambu Video Stream Tool" --packAuthors "DrEsteban" --skipVeloAppCheck
