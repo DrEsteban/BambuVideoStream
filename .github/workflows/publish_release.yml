@@ -125,7 +125,7 @@ jobs:
       - name: Unzip Artifacts
         run: |
           mkdir -p ./publish/win-x64
-          Expand-Archive -Path ./binaries/win-x64.zip -DestinationPath ./publish/win-x64
+          Expand-Archive -Path ./binaries/win-x64.zip -DestinationPath ./publish
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -135,7 +135,7 @@ jobs:
       - name: Upload Velopack
         run: |
           dotnet tool restore
-          dotnet vpk pack -o "./vpk" -u "DrEsteban.BambuVideoStream" -v "${{ needs.release.outputs.version }}" -p "./publish/win-x64" --mainExe "BambuVideoStream.exe" --packTitle "Bambu Video Stream Tool" --packAuthors "DrEsteban" --skipVeloAppCheck
+          dotnet vpk pack -o "./vpk" -u "DrEsteban.BambuVideoStream" -v "${{ needs.release.outputs.version }}" -p "./publish/publish/win-x64" --mainExe "BambuVideoStream.exe" --packTitle "Bambu Video Stream Tool" --packAuthors "DrEsteban" --skipVeloAppCheck
 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
