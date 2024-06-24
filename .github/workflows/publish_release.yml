@@ -142,7 +142,7 @@ jobs:
         run: |
           dotnet tool restore
           dotnet vpk download github -o "./vpk" --repoUrl "https://github.com/${{ github.repository }}"
-          dotnet vpk pack -o "./vpk" -u "DrEsteban.BambuVideoStream" -v "${{ needs.release.outputs.version }}" -p "./publish/publish/win-x64" --mainExe "BambuVideoStream.exe" --packTitle "Bambu Video Stream Tool" --packAuthors "DrEsteban" --skipVeloAppCheck
+          dotnet vpk pack -o "./vpk" -u "DrEsteban.BambuVideoStream" -v "${{ needs.release.outputs.version }}" -p "./publish/publish/win-x64" --mainExe "BambuVideoStream.exe" --packTitle "Bambu Video Stream Tool" --icon "./BambuVideoStream/icon.ico" --packAuthors "DrEsteban" --skipVeloAppCheck
 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
