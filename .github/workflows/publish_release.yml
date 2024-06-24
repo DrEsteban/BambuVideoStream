@@ -123,6 +123,7 @@ jobs:
 
       - name: Unzip Artifacts
         run: |
+          ls
           mkdir -p ./publish/win-x64
           Expand-Archive -Path ./binaries/win-x64.zip -DestinationPath ./publish/win-x64
 
