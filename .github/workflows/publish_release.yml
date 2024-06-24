@@ -134,7 +134,7 @@ jobs:
 
       - name: Upload Velopack
         run: |
-          dotnet tool install
+          dotnet tool restore
           dotnet vpk pack -o "./vpk" -u "DrEsteban.BambuVideoStream" -v "${{ needs.release.outputs.version }}" -p "./publish/win-x64" --mainExe "BambuVideoStream.exe" --packTitle "Bambu Video Stream Tool" --packAuthors "DrEsteban" --skipVeloAppCheck
 
       - name: Generate artifact attestation
