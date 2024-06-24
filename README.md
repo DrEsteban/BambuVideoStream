@@ -9,6 +9,7 @@
 > * Switched to an FTP library that _should_ be cross-platform. (Doesn't rely on WinSCP.exe)
 > * General code cleanup, refactoring, and updating to modern .NET practices
 > * Adding publishing of ready-to-use binaries for end-users, with more prescriptive instructions
+> * Created an installer with auto update for Windows
 >
 > I also had to fork [obs-websocket-dotnet](https://github.com/BarRaider/obs-websocket-dotnet) to fix/workaround some annoying issues & behavior. This project has a submodule reference to [my fork](https://github.com/DrEsteban/obs-websocket-dotnet) of it.
 
