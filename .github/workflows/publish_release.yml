@@ -112,6 +112,7 @@ jobs:
     permissions:
       id-token: write
       contents: write
+      attestations: write
 
     steps:
       - uses: actions/checkout@v4
@@ -129,8 +130,16 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+
       - name: Upload Velopack
         run: |
           dotnet tool install
           dotnet vpk pack -o "./vpk" -u "DrEsteban.BambuVideoStream" -v "${{ needs.release.outputs.version }}" -p "./publish/win-x64" --mainExe "BambuVideoStream.exe" --packTitle "Bambu Video Stream Tool" --packAuthors "DrEsteban" --skipVeloAppCheck
-          run: dotnet vpk upload github -o ./vpk --repoUrl ${{ github.repositoryUrl }} --merge --releaseName "${{ needs.release.outputs.version_tag }}" --token "${{ github.token }}"
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: './vpk/**'
+
+      - name: Upload Velopack 
+        run: dotnet vpk upload github -o ./vpk --repoUrl ${{ github.repositoryUrl }} --merge --releaseName "${{ needs.release.outputs.version_tag }}" --token "${{ github.token }}"
