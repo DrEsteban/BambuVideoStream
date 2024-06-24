@@ -37,15 +37,13 @@ static async Task UpdateCheckAsync(string[] args)
             {
                 await Task.Delay(250);
             }
-            if (Console.KeyAvailable && Console.ReadKey().Key == ConsoleKey.Y)
-            {
-                Console.WriteLine("Updating...");
-            }
-            else
+            if (!Console.KeyAvailable || Console.ReadKey().Key != ConsoleKey.Y)
             {
                 Console.WriteLine("Update skipped.");
                 return;
             }
+
+            Console.WriteLine("Updating...");
             // download new version
             await mgr.DownloadUpdatesAsync(newVersion, progress => Console.WriteLine($"{progress}% completed", progress));
             Console.WriteLine("Download completed. Restarting...");
