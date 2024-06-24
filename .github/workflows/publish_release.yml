@@ -96,6 +96,9 @@ jobs:
         prerelease: false
         allowUpdates: true
 
+    - name: Write version summary
+      run: echo "# Published ${{ steps.set_version.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY
+
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -147,4 +150,6 @@ jobs:
           subject-path: './vpk/**'
 
       - name: Upload Velopack 
-        run: dotnet vpk upload github -o ./vpk --repoUrl "https://github.com/${{ github.repository }}" --merge --releaseName "${{ needs.release.outputs.version_tag }}" --tag "${{ needs.release.outputs.version_tag }}" --token "${{ github.token }}"
+        run: |
+          dotnet vpk upload github -o ./vpk --repoUrl "https://github.com/${{ github.repository }}" --merge --releaseName "${{ needs.release.outputs.version_tag }}" --tag "${{ needs.release.outputs.version_tag }}" --token "${{ github.token }}"
+          echo "# Published Velopack ${{ steps.set_version.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY
