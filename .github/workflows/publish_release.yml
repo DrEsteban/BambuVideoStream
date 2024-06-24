@@ -143,4 +143,4 @@ jobs:
           subject-path: './vpk/**'
 
       - name: Upload Velopack 
-        run: dotnet vpk upload github -o ./vpk --repoUrl "https://github.com/${{ github.repository }}" --merge --releaseName "${{ needs.release.outputs.version_tag }}" --token "${{ github.token }}"
+        run: dotnet vpk upload github -o ./vpk --repoUrl "https://github.com/${{ github.repository }}" --merge --releaseName "${{ needs.release.outputs.version_tag }}" --tag "${{ needs.release.outputs.version_tag }}" --token "${{ github.token }}"
