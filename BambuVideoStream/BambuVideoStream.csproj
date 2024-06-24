@@ -15,6 +15,21 @@
     <!-- This application will generally be long-running -->
     <ServerGarbageCollection>true</ServerGarbageCollection>
   </PropertyGroup>
+  
+  <Choose>
+    <When Condition="$(DisableVelopack) != 'true' and ($(ForceEnableVelopack) == 'true' or $(Configuration) == 'Debug' or $(RuntimeIdentifier.StartsWith('win')) == 'True')">
+      <PropertyGroup>
+        <UseVelopack>True</UseVelopack>
+        <DefineConstants>$(DefineConstants);UseVelopack</DefineConstants>
+      </PropertyGroup> 
+    </When>
+    <Otherwise>
+      <PropertyGroup>
+        <UseVelopack>False</UseVelopack>
+      </PropertyGroup>
+    </Otherwise>
+  </Choose>
+  
   <ItemGroup>
     <EmbeddedResource Include="Images\*" />
     <Content Include="icon.ico" />
@@ -29,6 +44,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
+    <PackageReference Include="Velopack" Version="0.0.359" Condition="$(UseVelopack)"/>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\obs-websocket-dotnet\obs-websocket-dotnet\obs-websocket-dotnet.csproj" />

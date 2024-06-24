@@ -1,13 +1,61 @@
 ﻿using System;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Threading.Tasks;
 using BambuVideoStream;
 using BambuVideoStream.Models;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+
+#if UseVelopack
+using Velopack;
+using Velopack.Sources;
+
+static async Task UpdateCheckAsync(string[] args)
+{
+    VelopackApp.Build().Run();
+
+    var mgr = new UpdateManager(new GithubSource("https://github.com/DrEsteban/BambuVideoStream", null, false), new UpdateOptions
+    {
+        AllowVersionDowngrade = true,
+    });
+
+    // check for new version
+    if (mgr.IsInstalled)
+    {
+        var newVersion = await mgr.CheckForUpdatesAsync();
+        if (newVersion != null)
+        {
+            Console.WriteLine($"New update found! ({mgr.CurrentVersion} -> {newVersion.TargetFullRelease.Version})");
+            Console.WriteLine("Press 'y' within 10 seconds to update...");
+            var sw = Stopwatch.StartNew();
+            while (!Console.KeyAvailable && sw.Elapsed < TimeSpan.FromSeconds(10))
+            {
+                await Task.Delay(250);
+            }
+            if (!Console.KeyAvailable || Console.ReadKey().Key != ConsoleKey.Y)
+            {
+                Console.WriteLine("Update skipped.");
+                return;
+            }
+
+            Console.WriteLine("Updating...");
+            // download new version
+            await mgr.DownloadUpdatesAsync(newVersion, progress => Console.WriteLine($"{progress}% completed", progress));
+            Console.WriteLine("Download completed. Restarting...");
+
+            // install new version and restart app
+            mgr.ApplyUpdatesAndRestart(newVersion, args);
+        }
+    }
+}
+
+await UpdateCheckAsync(args);
+#endif
 
 // Extract embedded resources to the file system
 {
@@ -54,6 +102,6 @@ GlobalLogger = host.Services.GetRequiredService<ILogger<Program>>();
 await host.RunAsync();
 
 public partial class Program
-{ 
+{
     internal static ILogger<Program> GlobalLogger { get; private set; }
 }

@@ -92,3 +92,55 @@ jobs:
         draft: ${{ inputs.draft }}
         prerelease: false
         allowUpdates: true
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: binaries
+        path: ./release
+
+    outputs:
+      version: ${{ steps.set_version.outputs.version }}
+      version_tag: ${{ steps.set_version.outputs.version_tag }}
+
+
+  velopack:
+
+    runs-on: windows-latest
+    needs: release
+
+    permissions:
+      id-token: write
+      contents: write
+      attestations: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries
+          path: ./binaries
+
+      - name: Unzip Artifacts
+        run: |
+          mkdir -p ./publish/win-x64
+          Expand-Archive -Path ./binaries/win-x64.zip -DestinationPath ./publish
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Create Velopack
+        run: |
+          dotnet tool restore
+          dotnet vpk pack -o "./vpk" -u "DrEsteban.BambuVideoStream" -v "${{ needs.release.outputs.version }}" -p "./publish/publish/win-x64" --mainExe "BambuVideoStream.exe" --packTitle "Bambu Video Stream Tool" --packAuthors "DrEsteban" --skipVeloAppCheck
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-path: './vpk/**'
+
+      - name: Upload Velopack 
+        run: dotnet vpk upload github -o ./vpk --repoUrl "https://github.com/${{ github.repository }}" --merge --releaseName "${{ needs.release.outputs.version_tag }}" --tag "${{ needs.release.outputs.version_tag }}" --token "${{ github.token }}"
