@@ -152,4 +152,4 @@ jobs:
       - name: Upload Velopack 
         run: |
           dotnet vpk upload github -o ./vpk --repoUrl "https://github.com/${{ github.repository }}" --merge --releaseName "${{ needs.release.outputs.version_tag }}" --tag "${{ needs.release.outputs.version_tag }}" --token "${{ github.token }}"
-          echo "# Published Velopack ${{ steps.set_version.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "# Published Velopack ${{ needs.release.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY
