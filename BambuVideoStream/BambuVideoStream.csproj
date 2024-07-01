@@ -44,7 +44,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.0" />
-    <PackageReference Include="Velopack" Version="0.0.359" Condition="$(UseVelopack)"/>
+    <PackageReference Include="Velopack" Version="0.0.556" Condition="$(UseVelopack)"/>
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\obs-websocket-dotnet\obs-websocket-dotnet\obs-websocket-dotnet.csproj" />
