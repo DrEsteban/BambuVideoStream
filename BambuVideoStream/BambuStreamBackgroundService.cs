@@ -253,6 +253,7 @@ public class BambuStreamBackgroundService : BackgroundService
         {
             this.log.LogError("MQTT authentication failed. Check your Bambu settings.");
         }
+        // TODO try to reconnect?
         if (this.appSettings.ExitOnEndpointDisconnect)
         {
             this.hostLifetime.StopApplication();
