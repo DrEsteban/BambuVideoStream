@@ -10,7 +10,7 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 #if UseVelopack
-await VelopackSupport.UpdateCheckAsync(args);
+await VelopackSupport.InitializeAsync(args);
 #endif
 
 // Extract embedded resources to the file system
@@ -32,8 +32,12 @@ await VelopackSupport.UpdateCheckAsync(args);
 }
 
 var builder = new HostApplicationBuilder(args);
-// Optional config file that can contain user settings
+// Config files with connection settings and user secrets
 builder.Configuration.AddJsonFile("secrets.json", optional: true);
+builder.Configuration.AddJsonFile("connection.json", optional: true);
+#if UseVelopack
+builder.Configuration.AddJsonFile(VelopackSupport.ConnectionSettingsFilePath, optional: false);
+#endif
 
 string fileLogFormat = builder.Configuration.GetValue<string>("Logging:File:FilenameFormat");
 if (!string.IsNullOrEmpty(fileLogFormat))
@@ -56,6 +60,9 @@ var host = builder.Build();
 GlobalLogger = host.Services.GetRequiredService<ILogger<Program>>();
 
 await host.RunAsync();
+
+Console.WriteLine("Press any key to exit...");
+Console.ReadKey(intercept: true);
 // End
 
 
