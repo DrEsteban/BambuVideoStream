@@ -51,8 +51,10 @@ internal static class VelopackSupport
             var newVersion = await mgr.CheckForUpdatesAsync();
             if (newVersion != null && newVersion.TargetFullRelease.Version > mgr.CurrentVersion)
             {
+                Console.WriteLine();
                 Console.WriteLine($"New update found! ({mgr.CurrentVersion} -> {newVersion.TargetFullRelease.Version})");
                 Console.WriteLine("NOTE: When you update, your connection settings will be preserved but application settings will be reset.");
+                Console.WriteLine();
                 Console.WriteLine("Press 'y' within 10 seconds to update...");
                 var sw = Stopwatch.StartNew();
                 while (!Console.KeyAvailable && sw.Elapsed < TimeSpan.FromSeconds(10))
@@ -62,16 +64,18 @@ internal static class VelopackSupport
                 if (!Console.KeyAvailable || Console.ReadKey().Key != ConsoleKey.Y)
                 {
                     Console.WriteLine("Update skipped.");
-                    return;
                 }
+                else
+                {
+                    Console.WriteLine("Updating...");
+                    // download new version
+                    await mgr.DownloadUpdatesAsync(newVersion, progress => Console.WriteLine($"{progress}% completed", progress));
+                    Console.WriteLine("Download completed. Restarting...");
 
-                Console.WriteLine("Updating...");
-                // download new version
-                await mgr.DownloadUpdatesAsync(newVersion, progress => Console.WriteLine($"{progress}% completed", progress));
-                Console.WriteLine("Download completed. Restarting...");
-
-                // install new version and restart app
-                mgr.ApplyUpdatesAndRestart(newVersion, args);
+                    // install new version and restart app
+                    mgr.ApplyUpdatesAndRestart(newVersion, args);
+                    Exit(); // Shouldn't be hit
+                }
             }
         }
         catch (Exception e)
@@ -80,6 +84,7 @@ internal static class VelopackSupport
             Console.ForegroundColor = ConsoleColor.Red;
             Console.Error.WriteLine($"Error checking for updates: {e.GetType().Name}: {e.Message}");
             Console.ForegroundColor = c;
+            await Task.Delay(TimeSpan.FromSeconds(4));
         }
 
         // header
