@@ -111,8 +111,10 @@ internal static class VelopackSupport
                 """;
             File.WriteAllText(connectionSettingsFilePath, template);
             Console.WriteLine("You must configure a connection.json file to run this application.");
-            Console.WriteLine($"We will now launch the text editor to create this file at '{connectionSettingsFilePath}'.");
-            Console.WriteLine("When done, please restart the application.");
+            Console.WriteLine();
+            Console.WriteLine("We will now launch the text editor to create this file at:");
+            Console.WriteLine($"  '{connectionSettingsFilePath}'");
+            Console.WriteLine("When you're done filling it out, *please restart the application*.");
             Console.WriteLine();
             Console.WriteLine("Press ENTER to continue, or Ctrl+C to quit...");
             Console.ReadLine();
@@ -139,6 +141,7 @@ internal static class VelopackSupport
                 {
                     case ConsoleKey.D1:
                     case ConsoleKey.NumPad1:
+                    case ConsoleKey.Enter:
                         // Return to launch the application
                         Console.Clear();
                         return;
