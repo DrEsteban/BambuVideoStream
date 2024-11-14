@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 #if UseVelopack
 await VelopackSupport.InitializeAsync(args);
@@ -50,6 +51,28 @@ if (!string.IsNullOrEmpty(fileLogFormat))
     builder.Logging.AddFile(Path.ChangeExtension(fileLogFormat, ".json"), minimumLevel: minLevel, isJson: true);
 }
 builder.Services.Configure<BambuSettings>(builder.Configuration.GetSection(nameof(BambuSettings)));
+builder.Services.AddSingleton<IOptions<BambuSettings>>(c =>
+{
+    var settings = builder.Configuration.GetSection(nameof(BambuSettings)).Get<BambuSettings>() ?? new();
+    if (string.IsNullOrWhiteSpace(settings.PathToSDP))
+    {
+        var logger = c.GetRequiredService<ILogger<Program>>();
+        try
+        {
+            settings.PathToSDP = Path.GetFullPath(Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BambuStudio/cameratools/ffmpeg.sdp"));
+        }
+        catch (PlatformNotSupportedException)
+        {
+            // Doesn't work on Mac/Linux, user must set via appsettings
+            logger.LogTrace("Platform '{platform}' does not support SpecialFolder.ApplicationData. User must set PathToSDP via appsettings.", Environment.OSVersion.Platform);
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Error setting default path to SDP. That's okay if you've set it via appsettings.");
+        }
+    }
+    return Options.Create(settings);
+});
 builder.Services.Configure<OBSSettings>(builder.Configuration.GetSection(nameof(OBSSettings)));
 builder.Services.Configure<AppSettings>(builder.Configuration.GetSection(nameof(AppSettings)));
 builder.Services.AddTransient<FtpService>();
@@ -57,17 +80,9 @@ builder.Services.AddTransient<MyOBSWebsocket>();
 builder.Services.AddHostedService<BambuStreamBackgroundService>();
 
 using var host = builder.Build();
-GlobalLogger = host.Services.GetRequiredService<ILogger<Program>>();
-
 await host.RunAsync();
 
+#if UseVelopack
 Console.WriteLine("Press any key to exit...");
 Console.ReadKey(intercept: true);
-// End
-
-
-// Program.cs class members
-public partial class Program
-{
-    internal static ILogger<Program> GlobalLogger { get; private set; }
-}
+#endif
