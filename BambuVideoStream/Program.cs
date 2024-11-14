@@ -1,7 +1,9 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using Azure.Monitor.OpenTelemetry.Exporter;
 using BambuVideoStream;
 using BambuVideoStream.Models;
 using Microsoft.Extensions.Configuration;
@@ -9,6 +11,9 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 
 #if UseVelopack
 await VelopackSupport.InitializeAsync(args);
@@ -32,28 +37,90 @@ await VelopackSupport.InitializeAsync(args);
     }
 }
 
+// Build the host
 var builder = new HostApplicationBuilder(args);
+var services = builder.Services;
+var configuration = builder.Configuration;
+var environment = builder.Environment;
+var logging = builder.Logging;
+
 // Config files with connection settings and user secrets
-builder.Configuration.AddJsonFile("secrets.json", optional: true);
-builder.Configuration.AddJsonFile("connection.json", optional: true);
+configuration.AddJsonFile("secrets.json", optional: true);
+configuration.AddJsonFile("connection.json", optional: true);
 #if UseVelopack
-builder.Configuration.AddJsonFile(VelopackSupport.ConnectionSettingsFilePath, optional: false);
+configuration.AddJsonFile(VelopackSupport.ConnectionSettingsFilePath, optional: false);
 #endif
 
-string fileLogFormat = builder.Configuration.GetValue<string>("Logging:File:FilenameFormat");
+// Telemetry
+services.AddMetrics();
+bool useAzureMonitor = !string.IsNullOrWhiteSpace(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]);
+bool useOtlpExporter = !string.IsNullOrWhiteSpace(configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+logging.AddOpenTelemetry(o =>
+{
+    o.ParseStateValues =
+        o.IncludeFormattedMessage =
+        o.IncludeScopes = true;
+});
+var otel = services.AddOpenTelemetry()
+    .ConfigureResource(r =>
+    {
+        _ = r.AddService(
+                environment.ApplicationName,
+                serviceNamespace: "DrEsteban",
+                serviceVersion: Assembly.GetExecutingAssembly().GetName().Version?.ToString())
+            .AddAttributes([KeyValuePair.Create<string, object>("DOTNET_ENVIRONMENT", environment.EnvironmentName)])
+            .AddEnvironmentVariableDetector()
+            .AddHostDetector()
+            .AddProcessDetector()
+            .AddProcessRuntimeDetector()
+            .AddOperatingSystemDetector()
+            .AddTelemetrySdk();
+    })
+    .WithLogging(l =>
+    {
+        if (useAzureMonitor)
+        {
+            l.AddAzureMonitorLogExporter();
+        }
+    })
+    .WithTracing(t =>
+    {
+        if (useAzureMonitor)
+        {
+            t.AddAzureMonitorTraceExporter();
+        }
+    })
+    .WithMetrics(m =>
+    {
+        m.AddRuntimeInstrumentation()
+            .AddProcessInstrumentation();
+        if (useAzureMonitor)
+        {
+            m.AddAzureMonitorMetricExporter();
+        }
+    });
+if (useOtlpExporter)
+{
+    otel.UseOtlpExporter();
+}
+
+// Log files
+string fileLogFormat = configuration.GetValue<string>("Logging:File:FilenameFormat");
 if (!string.IsNullOrEmpty(fileLogFormat))
 {
-    if (!Enum.TryParse(builder.Configuration.GetValue<string>("Logging:File:MinimumLevel"), out LogLevel minLevel))
+    if (!Enum.TryParse(configuration.GetValue<string>("Logging:File:MinimumLevel"), out LogLevel minLevel))
     {
         minLevel = LogLevel.Information;
     }
     builder.Logging.AddFile(fileLogFormat, minimumLevel: minLevel, isJson: false);
     builder.Logging.AddFile(Path.ChangeExtension(fileLogFormat, ".json"), minimumLevel: minLevel, isJson: true);
 }
-builder.Services.Configure<BambuSettings>(builder.Configuration.GetSection(nameof(BambuSettings)));
-builder.Services.AddSingleton<IOptions<BambuSettings>>(c =>
+
+// Services
+services.Configure<BambuSettings>(configuration.GetSection(nameof(BambuSettings)));
+services.AddSingleton<IOptions<BambuSettings>>(c =>
 {
-    var settings = builder.Configuration.GetSection(nameof(BambuSettings)).Get<BambuSettings>() ?? new();
+    var settings = configuration.GetSection(nameof(BambuSettings)).Get<BambuSettings>() ?? new();
     if (string.IsNullOrWhiteSpace(settings.PathToSDP))
     {
         var logger = c.GetRequiredService<ILogger<Program>>();
@@ -73,12 +140,13 @@ builder.Services.AddSingleton<IOptions<BambuSettings>>(c =>
     }
     return Options.Create(settings);
 });
-builder.Services.Configure<OBSSettings>(builder.Configuration.GetSection(nameof(OBSSettings)));
-builder.Services.Configure<AppSettings>(builder.Configuration.GetSection(nameof(AppSettings)));
-builder.Services.AddTransient<FtpService>();
-builder.Services.AddTransient<MyOBSWebsocket>();
-builder.Services.AddHostedService<BambuStreamBackgroundService>();
+services.Configure<OBSSettings>(configuration.GetSection(nameof(OBSSettings)));
+services.Configure<AppSettings>(configuration.GetSection(nameof(AppSettings)));
+services.AddTransient<FtpService>();
+services.AddTransient<MyOBSWebsocket>();
+services.AddHostedService<BambuStreamBackgroundService>();
 
+// Build and run
 using var host = builder.Build();
 await host.RunAsync();
 

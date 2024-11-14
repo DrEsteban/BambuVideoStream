@@ -36,6 +36,7 @@
     <Content Include="../README.md" CopyToOutputDirectory="Always" />
   </ItemGroup>
   <ItemGroup>
+    <PackageReference Include="Azure.Monitor.OpenTelemetry.Exporter" Version="1.4.0-beta.2" />
     <PackageReference Include="FluentFTP" Version="51.1.0" />
     <PackageReference Include="FluentFTP.GnuTLS" Version="1.0.31" />
     <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
@@ -43,6 +44,14 @@
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.10.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.10.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="0.5.0-beta.7" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.9.0" />
+    <PackageReference Include="OpenTelemetry.Resources.Host" Version="0.1.0-beta.3" />
+    <PackageReference Include="OpenTelemetry.Resources.OperatingSystem" Version="0.1.0-alpha.4" />
+    <PackageReference Include="OpenTelemetry.Resources.Process" Version="0.1.0-beta.3" />
+    <PackageReference Include="OpenTelemetry.Resources.ProcessRuntime" Version="0.1.0-beta.2" />
     <PackageReference Include="Velopack" Version="0.0.869" Condition="$(UseVelopack)" />
   </ItemGroup>
   <ItemGroup>
