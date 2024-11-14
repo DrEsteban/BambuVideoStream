@@ -6,6 +6,7 @@ using System.Security.Authentication;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
+using System.Threading.Channels;
 using System.Threading.Tasks;
 using BambuVideoStream.Models;
 using BambuVideoStream.Models.Mqtt;
@@ -42,6 +43,10 @@ public class BambuStreamBackgroundService : BackgroundService
     private readonly MyOBSWebsocket obs;
     private readonly FtpService ftpService;
     private readonly ConcurrentQueue<Action> queuedOperations = new();
+
+    private CancellationToken hostCancellationToken;
+    private SemaphoreSlim mqttReconnectionSemaphore = new(1);
+    private Channel<MqttApplicationMessageReceivedEventArgs> mqttProcessingChannel;
 
     private bool obsInitialized;
 
@@ -112,6 +117,13 @@ public class BambuStreamBackgroundService : BackgroundService
         this.ftpService = ftpService;
         this.log = logger;
         this.hostLifetime = hostLifetime;
+        this.mqttProcessingChannel = Channel.CreateBounded<MqttApplicationMessageReceivedEventArgs>(
+            new BoundedChannelOptions(5) // Max 5 messages in queue
+            { 
+                SingleReader = true,
+                FullMode = BoundedChannelFullMode.DropOldest,
+                AllowSynchronousContinuations = true
+            });
     }
 
     /// <summary>
@@ -119,6 +131,7 @@ public class BambuStreamBackgroundService : BackgroundService
     /// </summary>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        this.hostCancellationToken = stoppingToken;
         this.obs.ConnectAsync(this.obsSettings.WsConnection, this.obsSettings.WsPassword ?? string.Empty);
         stoppingToken.Register(() => this.obs.Disconnect());
 
@@ -130,12 +143,28 @@ public class BambuStreamBackgroundService : BackgroundService
             var connectResult = await this.mqttClient.ConnectAsync(this.mqttClientOptions, stoppingToken);
             if (connectResult?.ResultCode != MqttClientConnectResultCode.Success)
             {
-                throw new Exception($"Failed to connect to MQTT: {connectResult.ResultCode}");
+                throw new Exception($"Failed to connect to Bambu MQTT: {connectResult.ResultCode}");
             }
 
-            this.log.LogInformation("connected to MQTT");
+            this.log.LogInformation("Connected to Bambu MQTT");
 
             await this.mqttClient.SubscribeAsync(this.mqttSubscribeOptions, stoppingToken);
+
+            // Start processing messages
+            Task.Run(async () =>
+            {
+                await foreach (var e in this.mqttProcessingChannel.Reader.ReadAllAsync())
+                {
+                    try 
+                    { 
+                        this.ProcessBambuMessage(e);
+                        // Super small delay to prevent bombarding OBS
+                        await Task.Delay(10, stoppingToken);
+                    } 
+                    catch { } // Method logs all exceptions
+                }
+            }).Forget();
+            stoppingToken.Register(() => this.mqttProcessingChannel.Writer.Complete());
 
             // Wait for the application to stop
             var waitForClose = new TaskCompletionSource();
@@ -147,7 +176,10 @@ public class BambuStreamBackgroundService : BackgroundService
         }
         catch (Exception ex)
         {
-            this.log.LogError(ex, "MQTT failure");
+            this.log.LogError(ex, "Bambu MQTT failure");
+        }
+        finally
+        {
             this.hostLifetime.StopApplication();
         }
     }
@@ -157,7 +189,7 @@ public class BambuStreamBackgroundService : BackgroundService
     /// </summary>
     private async void Obs_Connected(object sender, EventArgs e)
     {
-        this.log.LogInformation("connected to OBS WebSocket");
+        this.log.LogInformation("Connected to OBS WebSocket");
 
         if (this.appSettings.PrintSceneItemsAndExit)
         {
@@ -222,7 +254,7 @@ public class BambuStreamBackgroundService : BackgroundService
         }
         catch (Exception ex)
         {
-            this.log.LogError(ex, "Failed to initialize OBS inputs. Is your OBS Studio setup correctly?");
+            this.log.LogError(ex, "Failed to initialize OBS inputs. Is your OBS Studio set up correctly?");
             this.hostLifetime.StopApplication();
         }
     }
@@ -232,46 +264,100 @@ public class BambuStreamBackgroundService : BackgroundService
     /// </summary>
     private void Obs_Disconnected(object sender, ObsDisconnectionInfo e)
     {
-        this.log.LogWarning("OBS WebSocket disconnected: {reason}", e.DisconnectReason);
+        this.obsInitialized = false;
+        this.log.LogWarning("OBS WebSocket disconnected: {reason} ({opcode})", e.DisconnectReason, e.ObsCloseCode);
+
         if (e.ObsCloseCode == ObsCloseCodes.AuthenticationFailed)
         {
             this.log.LogError("OBS WebSocket authentication failed. Check your OBS settings.");
+            this.hostLifetime.StopApplication();
+            return;
         }
-        if (this.appSettings.ExitOnEndpointDisconnect)
+
+        if (this.appSettings.ExitOnObsDisconnect)
         {
             this.hostLifetime.StopApplication();
+        }
+        else
+        {
+            // Reconnection will happen in background by OBSWebsocket
+            this.log.LogWarning("Waiting for OBS reconnection...");
         }
     }
 
     /// <summary>
     /// Called when the Bambu MQTT client disconnects
     /// </summary>
-    private Task MqttClient_DisconnectedAsync(MqttClientDisconnectedEventArgs arg)
+    private async Task MqttClient_DisconnectedAsync(MqttClientDisconnectedEventArgs arg)
     {
-        this.log.LogInformation("MQTT disconnected: {reason}", arg.Reason);
-        if (arg.Reason == MqttClientDisconnectReason.NotAuthorized)
+        this.log.LogWarning("Bambu MQTT disconnected: {reasonstring} ({reason})", arg.ReasonString, arg.Reason);
+
+        if (!await this.mqttReconnectionSemaphore.WaitAsync(0))
         {
-            this.log.LogError("MQTT authentication failed. Check your Bambu settings.");
+            // Another thread is already reconnecting
+            return;
         }
-        // TODO try to reconnect?
-        if (this.appSettings.ExitOnEndpointDisconnect)
+        try
         {
-            this.hostLifetime.StopApplication();
+            if (arg.Reason == MqttClientDisconnectReason.NotAuthorized)
+            {
+                this.log.LogError("Bambu MQTT authentication failed. Check your Bambu settings.");
+                this.hostLifetime.StopApplication();
+                return;
+            }
+
+            if (this.appSettings.ExitOnBambuDisconnect)
+            {
+                this.hostLifetime.StopApplication();
+            }
+            else
+            {
+                this.log.LogWarning("Waiting for Bambu MQTT reconnection...");
+                while (!this.mqttClient.IsConnected)
+                {
+                    try
+                    {
+                        await this.mqttClient.ReconnectAsync(this.hostCancellationToken);
+                        if (!this.mqttClient.IsConnected)
+                        {
+                            await Task.Delay(1000);
+                        }
+                    }
+                    catch (Exception e)
+                    {
+                        this.log.LogDebug(e, "Failed to reconnect to Bambu MQTT");
+                    }
+                }
+            }
         }
-        return Task.CompletedTask;
+        finally
+        {
+            this.mqttReconnectionSemaphore.Release();
+        }
     }
 
     /// <summary>
-    /// Main Bambu MQTT message processing method
+    /// Message receiver callback. Adds the message to the channel for processing.
     /// </summary>
-    private Task OnMessageReceived(MqttApplicationMessageReceivedEventArgs e)
+    private async Task OnMessageReceived(MqttApplicationMessageReceivedEventArgs e)
+    {
+        await this.mqttProcessingChannel.Writer.WriteAsync(e, this.hostCancellationToken);
+    }
+
+    /// <summary>
+    /// Main Bambu MQTT message processing method. Called by the channel reader.
+    /// </summary>
+    /// <remarks>
+    /// Catches all exceptions.
+    /// </remarks>
+    private void ProcessBambuMessage(MqttApplicationMessageReceivedEventArgs e)
     {
         try
         {
             string json = Encoding.UTF8.GetString(e.ApplicationMessage.PayloadSegment);
             this.log.LogTrace("Received message: {json}", json);
 
-            var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(json);
 
             var root = doc.RootElement.EnumerateObject().Select(x => x.Name).First();
 
@@ -388,8 +474,6 @@ public class BambuStreamBackgroundService : BackgroundService
         {
             this.log.LogError(ex, "Failed to process message");
         }
-
-        return Task.CompletedTask;
     }
 
     private string DetermineFileLocation(string subtaskName)
@@ -479,6 +563,7 @@ public class BambuStreamBackgroundService : BackgroundService
                         while (this.queuedOperations.TryDequeue(out var action))
                         {
                             action();
+                            await Task.Delay(250);
                         }
                     });
                 }

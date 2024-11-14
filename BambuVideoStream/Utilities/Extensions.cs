@@ -1,8 +1,9 @@
 ﻿using System;
+using System.Threading.Tasks;
 
 namespace BambuVideoStream.Utilities;
 
-internal static class StringExtensions
+internal static class Extensions
 {
     /// <summary>
     /// Ensures a string ends with a particular suffix
@@ -15,5 +16,10 @@ internal static class StringExtensions
         }
 
         return fileName + extension;
+    }
+
+    public static void Forget(this Task _)
+    {
+        // intentionally empty
     }
 }
