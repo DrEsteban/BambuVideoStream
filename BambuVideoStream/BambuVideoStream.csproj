@@ -40,9 +40,9 @@
     <PackageReference Include="FluentFTP.GnuTLS" Version="1.0.31" />
     <PackageReference Include="MQTTnet" Version="4.3.7.1207" />
     <PackageReference Include="Serilog.Extensions.Logging.File" Version="3.0.0" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
-    <PackageReference Include="Microsoft.Extensions.Logging" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
     <PackageReference Include="Velopack" Version="0.0.869" Condition="$(UseVelopack)" />
   </ItemGroup>
   <ItemGroup>

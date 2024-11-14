@@ -56,7 +56,7 @@ builder.Services.AddTransient<FtpService>();
 builder.Services.AddTransient<MyOBSWebsocket>();
 builder.Services.AddHostedService<BambuStreamBackgroundService>();
 
-var host = builder.Build();
+using var host = builder.Build();
 GlobalLogger = host.Services.GetRequiredService<ILogger<Program>>();
 
 await host.RunAsync();
