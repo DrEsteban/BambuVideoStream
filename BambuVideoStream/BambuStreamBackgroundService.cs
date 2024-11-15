@@ -119,10 +119,10 @@ public class BambuStreamBackgroundService : BackgroundService
         this.hostLifetime = hostLifetime;
         this.mqttProcessingChannel = Channel.CreateBounded<MqttApplicationMessageReceivedEventArgs>(
             new BoundedChannelOptions(5) // Max 5 messages in queue
-            { 
+            {
                 SingleReader = true,
                 FullMode = BoundedChannelFullMode.DropOldest,
-                AllowSynchronousContinuations = true
+                AllowSynchronousContinuations = false
             });
     }
 
@@ -151,19 +151,33 @@ public class BambuStreamBackgroundService : BackgroundService
             await this.mqttClient.SubscribeAsync(this.mqttSubscribeOptions, stoppingToken);
 
             // Start processing messages
-            Task.Run(async () =>
+            new Thread(async () =>
             {
-                await foreach (var e in this.mqttProcessingChannel.Reader.ReadAllAsync())
+                try
                 {
-                    try 
-                    { 
-                        this.ProcessBambuMessage(e);
-                        // Super small delay to prevent bombarding OBS
-                        await Task.Delay(10, stoppingToken);
-                    } 
-                    catch { } // Method logs all exceptions
+                    await foreach (var e in this.mqttProcessingChannel.Reader.ReadAllAsync(stoppingToken))
+                    {
+                        try
+                        {
+                            this.ProcessBambuMessage(e);
+                            // Super small delay to prevent bombarding OBS
+                            await Task.Delay(10, stoppingToken);
+                        }
+                        catch { } // Method logs all exceptions
+                    }
                 }
-            }).Forget();
+                catch (OperationCanceledException)
+                { }
+                catch (Exception ex)
+                {
+                    this.log.LogError(ex, "Unexpected error in reader thread");
+                }
+                finally
+                {
+                    this.log.LogDebug("Reader thread stopped");
+                    this.hostLifetime.StopApplication();
+                }
+            }).Start();
             stoppingToken.Register(() => this.mqttProcessingChannel.Writer.Complete());
 
             // Wait for the application to stop
@@ -462,7 +476,7 @@ public class BambuStreamBackgroundService : BackgroundService
                     break;
             }
         }
-        catch (ObjectDisposedException)
+        catch (Exception err) when (err is ObjectDisposedException or OperationCanceledException)
         {
             // Do nothing. This is expected when the service is shutting down.
         }
