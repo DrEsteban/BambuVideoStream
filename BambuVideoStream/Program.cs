@@ -6,6 +6,7 @@ using System.Reflection;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using BambuVideoStream;
 using BambuVideoStream.Models;
+using BambuVideoStream.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

@@ -12,7 +12,7 @@ using OBSWebsocketDotNet;
 using OBSWebsocketDotNet.Types;
 using static BambuVideoStream.Constants.OBS;
 
-namespace BambuVideoStream;
+namespace BambuVideoStream.Services;
 
 /// <summary>
 /// Overload of <see cref="OBSWebsocket"/> that adds additional custom functionality for the application
@@ -287,7 +287,7 @@ public class MyOBSWebsocket(
                 {
                     input.Settings["file"] = inputSettings.DefaultIconPath;
                     base.SetInputSettings(input);
-                    await Task.Delay(BackoffDelay);
+                    await Task.Delay(BackoffDelay, cancellationToken);
                 }
                 return input;
             }
