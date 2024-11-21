@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using BambuVideoStream.Models;
 using BambuVideoStream.Models.Wrappers;
@@ -53,7 +54,7 @@ public class MyOBSWebsocket(
     /// <summary>
     /// Ensures the output video settings are configured as expected.
     /// </summary>
-    public async Task EnsureVideoSettingsAsync()
+    public async Task EnsureVideoSettingsAsync(CancellationToken cancellationToken)
     {
         var settings = base.GetVideoSettings();
         if (settings.BaseWidth == VideoWidth && settings.OutputWidth == VideoWidth &&
@@ -76,13 +77,13 @@ public class MyOBSWebsocket(
         base.SetVideoSettings(settings);
 
         // Sleep before returning as to not overwhelm OBS :)
-        await Task.Delay(BackoffDelay);
+        await Task.Delay(BackoffDelay, cancellationToken);
     }
 
     /// <summary>
     /// Ensures an OBS scene named <see cref="BambuScene"/> exists.
     /// </summary>
-    public async Task EnsureBambuSceneAsync()
+    public async Task EnsureBambuSceneAsync(CancellationToken cancellationToken)
     {
         if (this.SceneExists(BambuScene))
         {
@@ -94,13 +95,13 @@ public class MyOBSWebsocket(
         base.SetCurrentProgramScene(BambuScene);
 
         // Sleep before returning as to not overwhelm OBS :)
-        await Task.Delay(BackoffDelay);
+        await Task.Delay(BackoffDelay, cancellationToken);
     }
 
     /// <summary>
     /// Creates the Bambu video feed input source if it doesn't exist.
     /// </summary>
-    public async Task EnsureBambuStreamSourceAsync()
+    public async Task EnsureBambuStreamSourceAsync(CancellationToken cancellationToken)
     {
         if (this.InputExists(BambuStreamSource, out var _))
         {
@@ -134,7 +135,7 @@ public class MyOBSWebsocket(
         while (base.GetMediaInputStatus(BambuStreamSource).State != MediaState.OBS_MEDIA_STATE_PLAYING)
         {
             this.log.LogInformation("Waiting for stream to start... (Make sure you enabled streaming in Bambu Studio)");
-            await Task.Delay(1000);
+            await Task.Delay(1000, cancellationToken);
         }
 
         // Transition can only be applied after the stream has been started
@@ -159,14 +160,14 @@ public class MyOBSWebsocket(
         }
 
         // Sleep before returning as to not overwhelm OBS :)
-        await Task.Delay(BackoffDelay);
+        await Task.Delay(BackoffDelay, cancellationToken);
     }
 
     /// <summary>
     /// Creates the transparent status backdrop if it doesn't exist.
     /// </summary>
     /// <returns></returns>
-    public async Task EnsureColorSourceAsync()
+    public async Task EnsureColorSourceAsync(CancellationToken cancellationToken)
     {
         const string ColorSource = "ColorSource";
         if (this.InputExists(ColorSource, out _))
@@ -210,7 +211,7 @@ public class MyOBSWebsocket(
         }
 
         // Sleep before returning as to not overwhelm OBS :)
-        await Task.Delay(100);
+        await Task.Delay(BackoffDelay, cancellationToken);
     }
 
     /// <summary>
@@ -218,7 +219,8 @@ public class MyOBSWebsocket(
     /// </summary>
     public async Task<InputSettings> EnsureTextInputAsync(
         InitialTextSettings inputSettings,
-        int zIndex)
+        int zIndex,
+        CancellationToken cancellationToken)
     {
         if (this.InputExists(inputSettings.Name, out var input))
         {
@@ -261,7 +263,7 @@ public class MyOBSWebsocket(
         }
 
         // Sleep before returning as to not overwhelm OBS :)
-        await Task.Delay(100);
+        await Task.Delay(BackoffDelay, cancellationToken);
         return base.GetInputSettings(inputSettings.Name);
     }
 
@@ -270,7 +272,8 @@ public class MyOBSWebsocket(
     /// </summary>
     public async Task<InputSettings> EnsureImageInputAsync(
         InitialIconSettings inputSettings,
-        int zIndex)
+        int zIndex,
+        CancellationToken cancellationToken)
     {
         if (this.InputExists(inputSettings.Name, out var input))
         {
@@ -316,7 +319,7 @@ public class MyOBSWebsocket(
         }
 
         // Sleep before returning as to not overwhelm OBS :)
-        await Task.Delay(100);
+        await Task.Delay(BackoffDelay, cancellationToken);
         return base.GetInputSettings(inputSettings.Name);
     }
 
@@ -325,9 +328,10 @@ public class MyOBSWebsocket(
     /// </summary>
     public async Task<ToggleIconInputSettings> EnsureImageInputAsync(
         InitialToggleIconSettings settings,
-        int zIndex)
+        int zIndex,
+        CancellationToken cancellationToken)
     {
-        var inputSettings = await this.EnsureImageInputAsync((InitialIconSettings)settings, zIndex);
+        var inputSettings = await this.EnsureImageInputAsync((InitialIconSettings)settings, zIndex, cancellationToken);
         return new ToggleIconInputSettings(inputSettings, settings);
     }
 
@@ -337,7 +341,7 @@ public class MyOBSWebsocket(
     public void UpdateText(InputSettings setting, string text)
     {
         setting.Settings["text"] = text;
-        this.SetInputSettings(setting);
+        base.SetInputSettings(setting);
     }
 
     /// <summary>
@@ -348,6 +352,6 @@ public class MyOBSWebsocket(
         settings.InputSettings.Settings["file"] = isEnabled 
             ? settings.InitialToggleIconSettings.DefaultEnabledIconPath 
             : settings.InitialToggleIconSettings.DefaultIconPath;
-        this.SetInputSettings(settings.InputSettings);
+        base.SetInputSettings(settings.InputSettings);
     }
 }

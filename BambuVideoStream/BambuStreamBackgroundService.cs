@@ -45,8 +45,8 @@ public class BambuStreamBackgroundService : BackgroundService
     private readonly ConcurrentQueue<Action> queuedOperations = new();
 
     private CancellationToken hostCancellationToken;
-    private SemaphoreSlim mqttReconnectionSemaphore = new(1);
-    private Channel<MqttApplicationMessageReceivedEventArgs> mqttProcessingChannel;
+    private readonly SemaphoreSlim mqttReconnectionSemaphore = new(1);
+    private readonly Channel<MqttApplicationMessageReceivedEventArgs> mqttProcessingChannel;
 
     private bool obsInitialized;
 
@@ -217,10 +217,10 @@ public class BambuStreamBackgroundService : BackgroundService
             // ===========================================
             // Scene and video stream
             // ===========================================
-            await this.obs.EnsureVideoSettingsAsync();
-            await this.obs.EnsureBambuSceneAsync();
-            await this.obs.EnsureBambuStreamSourceAsync();
-            await this.obs.EnsureColorSourceAsync();
+            await this.obs.EnsureVideoSettingsAsync(this.hostCancellationToken);
+            await this.obs.EnsureBambuSceneAsync(this.hostCancellationToken);
+            await this.obs.EnsureBambuStreamSourceAsync(this.hostCancellationToken);
+            await this.obs.EnsureColorSourceAsync(this.hostCancellationToken);
 
             // Z-index for inputs starts at 2 (will be incremented below), because the stream and color source are at 0 and 1
             int z_index = 2;
@@ -228,35 +228,35 @@ public class BambuStreamBackgroundService : BackgroundService
             // ===========================================
             // Text sources
             // ===========================================
-            this.chamberTemp = await this.obs.EnsureTextInputAsync(ChamberTempInitialSettings, z_index++);
-            this.bedTemp = await this.obs.EnsureTextInputAsync(BedTempInitialSettings, z_index++);
-            this.targetBedTemp = await this.obs.EnsureTextInputAsync(TargetBedTempInitialSettings, z_index++);
-            this.nozzleTemp = await this.obs.EnsureTextInputAsync(NozzleTempInitialSettings, z_index++);
-            this.targetNozzleTemp = await this.obs.EnsureTextInputAsync(TargetNozzleTempInitialSettings, z_index++);
-            this.percentComplete = await this.obs.EnsureTextInputAsync(PercentCompleteInitialSettings, z_index++);
-            this.layers = await this.obs.EnsureTextInputAsync(LayersInitialSettings, z_index++);
-            this.timeRemaining = await this.obs.EnsureTextInputAsync(TimeRemainingInitialSettings, z_index++);
-            this.subtaskName = await this.obs.EnsureTextInputAsync(SubtaskNameInitialSettings, z_index++);
-            this.stage = await this.obs.EnsureTextInputAsync(StageInitialSettings, z_index++);
-            this.partFan = await this.obs.EnsureTextInputAsync(PartFanInitialSettings, z_index++);
-            this.auxFan = await this.obs.EnsureTextInputAsync(AuxFanInitialSettings, z_index++);
-            this.chamberFan = await this.obs.EnsureTextInputAsync(ChamberFanInitialSettings, z_index++);
-            this.filament = await this.obs.EnsureTextInputAsync(FilamentInitialSettings, z_index++);
-            this.printWeight = await this.obs.EnsureTextInputAsync(PrintWeightInitialSettings, z_index++);
+            this.chamberTemp = await this.obs.EnsureTextInputAsync(ChamberTempInitialSettings, z_index++, this.hostCancellationToken);
+            this.bedTemp = await this.obs.EnsureTextInputAsync(BedTempInitialSettings, z_index++, this.hostCancellationToken);
+            this.targetBedTemp = await this.obs.EnsureTextInputAsync(TargetBedTempInitialSettings, z_index++, this.hostCancellationToken);
+            this.nozzleTemp = await this.obs.EnsureTextInputAsync(NozzleTempInitialSettings, z_index++, this.hostCancellationToken);
+            this.targetNozzleTemp = await this.obs.EnsureTextInputAsync(TargetNozzleTempInitialSettings, z_index++, this.hostCancellationToken);
+            this.percentComplete = await this.obs.EnsureTextInputAsync(PercentCompleteInitialSettings, z_index++, this.hostCancellationToken);
+            this.layers = await this.obs.EnsureTextInputAsync(LayersInitialSettings, z_index++, this.hostCancellationToken);
+            this.timeRemaining = await this.obs.EnsureTextInputAsync(TimeRemainingInitialSettings, z_index++, this.hostCancellationToken);
+            this.subtaskName = await this.obs.EnsureTextInputAsync(SubtaskNameInitialSettings, z_index++, this.hostCancellationToken);
+            this.stage = await this.obs.EnsureTextInputAsync(StageInitialSettings, z_index++, this.hostCancellationToken);
+            this.partFan = await this.obs.EnsureTextInputAsync(PartFanInitialSettings, z_index++, this.hostCancellationToken);
+            this.auxFan = await this.obs.EnsureTextInputAsync(AuxFanInitialSettings, z_index++, this.hostCancellationToken);
+            this.chamberFan = await this.obs.EnsureTextInputAsync(ChamberFanInitialSettings, z_index++, this.hostCancellationToken);
+            this.filament = await this.obs.EnsureTextInputAsync(FilamentInitialSettings, z_index++, this.hostCancellationToken);
+            this.printWeight = await this.obs.EnsureTextInputAsync(PrintWeightInitialSettings, z_index++, this.hostCancellationToken);
 
             // ===========================================
             // Image sources
             // ===========================================
-            this.nozzleTempIcon = await this.obs.EnsureImageInputAsync(NozzleTempIconInitialSettings, z_index++);
-            this.bedTempIcon = await this.obs.EnsureImageInputAsync(BedTempIconInitialSettings, z_index++);
-            this.partFanIcon = await this.obs.EnsureImageInputAsync(PartFanIconInitialSettings, z_index++);
-            this.auxFanIcon = await this.obs.EnsureImageInputAsync(AuxFanIconInitialSettings, z_index++);
-            this.chamberFanIcon = await this.obs.EnsureImageInputAsync(ChamberFanIconInitialSettings, z_index++);
-            this.previewImage = await this.obs.EnsureImageInputAsync(PreviewImageInitialSettings, z_index++);
+            this.nozzleTempIcon = await this.obs.EnsureImageInputAsync(NozzleTempIconInitialSettings, z_index++, this.hostCancellationToken);
+            this.bedTempIcon = await this.obs.EnsureImageInputAsync(BedTempIconInitialSettings, z_index++, this.hostCancellationToken);
+            this.partFanIcon = await this.obs.EnsureImageInputAsync(PartFanIconInitialSettings, z_index++, this.hostCancellationToken);
+            this.auxFanIcon = await this.obs.EnsureImageInputAsync(AuxFanIconInitialSettings, z_index++, this.hostCancellationToken);
+            this.chamberFanIcon = await this.obs.EnsureImageInputAsync(ChamberFanIconInitialSettings, z_index++, this.hostCancellationToken);
+            this.previewImage = await this.obs.EnsureImageInputAsync(PreviewImageInitialSettings, z_index++, this.hostCancellationToken);
             // Static image sources
-            await this.obs.EnsureImageInputAsync(ChamberTempIconInitialSettings, z_index++);
-            await this.obs.EnsureImageInputAsync(TimeIconInitialSettings, z_index++);
-            await this.obs.EnsureImageInputAsync(FilamentIconInitialSettings, z_index++);
+            await this.obs.EnsureImageInputAsync(ChamberTempIconInitialSettings, z_index++, this.hostCancellationToken);
+            await this.obs.EnsureImageInputAsync(TimeIconInitialSettings, z_index++, this.hostCancellationToken);
+            await this.obs.EnsureImageInputAsync(FilamentIconInitialSettings, z_index++, this.hostCancellationToken);
 
 
             this.obsInitialized = true;
@@ -265,6 +265,10 @@ public class BambuStreamBackgroundService : BackgroundService
             {
                 this.obs.StartStream();
             }
+        }
+        catch (OperationCanceledException)
+        {
+            // Do nothing. This is expected when the service is shutting down.
         }
         catch (Exception ex)
         {
@@ -327,14 +331,14 @@ public class BambuStreamBackgroundService : BackgroundService
             else
             {
                 this.log.LogWarning("Waiting for Bambu MQTT reconnection...");
-                while (!this.mqttClient.IsConnected)
+                while (!this.mqttClient.IsConnected && !this.hostCancellationToken.IsCancellationRequested)
                 {
                     try
                     {
                         await this.mqttClient.ReconnectAsync(this.hostCancellationToken);
                         if (!this.mqttClient.IsConnected)
                         {
-                            await Task.Delay(1000);
+                            await Task.Delay(1000, this.hostCancellationToken);
                         }
                     }
                     catch (Exception e)
@@ -573,11 +577,11 @@ public class BambuStreamBackgroundService : BackgroundService
                 {
                     Task.Run(async () =>
                     {
-                        await Task.Delay(5000);
+                        await Task.Delay(5000, this.hostCancellationToken);
                         while (this.queuedOperations.TryDequeue(out var action))
                         {
                             action();
-                            await Task.Delay(250);
+                            await Task.Delay(250, this.hostCancellationToken);
                         }
                     });
                 }
