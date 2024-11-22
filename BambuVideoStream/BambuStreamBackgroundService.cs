@@ -132,7 +132,7 @@ public class BambuStreamBackgroundService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         this.hostCancellationToken = stoppingToken;
-        this.obs.ConnectAsync(this.obsSettings.WsConnection, this.obsSettings.WsPassword ?? string.Empty);
+        this.obs.ConnectAsync(this.obsSettings.WsAddress, this.obsSettings.WsPassword ?? string.Empty);
         stoppingToken.Register(() => this.obs.Disconnect());
 
         var mqttFactory = new MqttFactory();
@@ -614,7 +614,7 @@ public class BambuStreamBackgroundService : BackgroundService
 
         foreach (var input in list)
         {
-            string scene = "BambuStream";
+            string scene = this.obsSettings.BambuScene;
             string source = input.InputName;
 
             try

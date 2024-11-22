@@ -116,7 +116,7 @@ internal static class VelopackSupport
                     "serial": "<serial of printer>"
                   },
                   "ObsSettings": {
-                    "WsConnection": "ws://localhost:4455",
+                    "WsAddress": "ws://localhost:4455",
                     "WsPassword": "<your password here, or comment out>"
                   }
                 }

@@ -85,14 +85,15 @@ public class MyOBSWebsocket(
     /// </summary>
     public async Task EnsureBambuSceneAsync(CancellationToken cancellationToken)
     {
-        if (this.SceneExists(BambuScene))
+        string scene = this.obsSettings.BambuScene;
+        if (this.SceneExists(scene))
         {
             return;
         }
 
-        this.log.LogInformation("Creating scene {sceneName}", BambuScene);
-        base.CreateScene(BambuScene);
-        base.SetCurrentProgramScene(BambuScene);
+        this.log.LogInformation("Creating scene {sceneName}", scene);
+        base.CreateScene(scene);
+        base.SetCurrentProgramScene(scene);
 
         // Sleep before returning as to not overwhelm OBS :)
         await Task.Delay(BackoffDelay, cancellationToken);
@@ -103,11 +104,13 @@ public class MyOBSWebsocket(
     /// </summary>
     public async Task EnsureBambuStreamSourceAsync(CancellationToken cancellationToken)
     {
-        if (this.InputExists(BambuStreamSource, out var _))
+        string scene = this.obsSettings.BambuScene;
+        string streamSource = this.obsSettings.BambuStreamSource;
+        if (this.InputExists(streamSource, out var _))
         {
             if (this.obsSettings.ForceCreateInputs)
             {
-                base.RemoveInput(BambuStreamSource);
+                base.RemoveInput(streamSource);
             }
             else
             {
@@ -129,10 +132,10 @@ public class MyOBSWebsocket(
                 { "reconnect_delay_sec", 2 }
             };
 
-        var id = base.CreateInput(BambuScene, BambuStreamSource, VideoInputType, bambuStream, true);
+        var id = base.CreateInput(scene, streamSource, VideoInputType, bambuStream, true);
 
         // Wait for stream to start
-        while (base.GetMediaInputStatus(BambuStreamSource).State != MediaState.OBS_MEDIA_STATE_PLAYING)
+        while (base.GetMediaInputStatus(streamSource).State != MediaState.OBS_MEDIA_STATE_PLAYING)
         {
             this.log.LogInformation("Waiting for stream to start... (Make sure you enabled streaming in Bambu Studio)");
             await Task.Delay(1000, cancellationToken);
@@ -150,13 +153,13 @@ public class MyOBSWebsocket(
             { "boundsHeight", VideoHeight },
             { "boundsWidth", VideoWidth },
         };
-        base.SetSceneItemTransform(BambuScene, id, transform);
+        base.SetSceneItemTransform(scene, id, transform);
 
         // Make sure video source is in the background
-        base.SetSceneItemIndex(BambuScene, id, 0);
+        base.SetSceneItemIndex(scene, id, 0);
         if (this.obsSettings.LockInputs)
         {
-            base.SetSceneItemLocked(BambuScene, id, true);
+            base.SetSceneItemLocked(scene, id, true);
         }
 
         // Sleep before returning as to not overwhelm OBS :)
@@ -194,20 +197,22 @@ public class MyOBSWebsocket(
             {"width", VideoWidth}
         };
 
-        var id = base.CreateInput(BambuScene, ColorSource, ColorInputType, colorSource, true);
+        string scene = this.obsSettings.BambuScene;
+
+        var id = base.CreateInput(scene, ColorSource, ColorInputType, colorSource, true);
 
         var transform = new JObject
         {
             { "positionX", 0 },
             { "positionY", 950 }
         };
-        base.SetSceneItemTransform(BambuScene, id, transform);
+        base.SetSceneItemTransform(scene, id, transform);
 
         // Make sure color source is in the foreground
-        base.SetSceneItemIndex(BambuScene, id, 1);
+        base.SetSceneItemIndex(scene, id, 1);
         if (this.obsSettings.LockInputs)
         {
-            base.SetSceneItemLocked(BambuScene, id, true);
+            base.SetSceneItemLocked(scene, id, true);
         }
 
         // Sleep before returning as to not overwhelm OBS :)
@@ -247,19 +252,20 @@ public class MyOBSWebsocket(
                 }
             }
         };
-        var id = base.CreateInput(BambuScene, inputSettings.Name, TextInputType, itemData, true);
+        string scene = this.obsSettings.BambuScene;
+        var id = base.CreateInput(scene, inputSettings.Name, TextInputType, itemData, true);
 
         var transform = new JObject
         {
             { "positionX", inputSettings.DefaultPositionX },
             { "positionY", inputSettings.DefaultPositionY }
         };
-        base.SetSceneItemTransform(BambuScene, id, transform);
+        base.SetSceneItemTransform(scene, id, transform);
 
-        base.SetSceneItemIndex(BambuScene, id, zIndex);
+        base.SetSceneItemIndex(scene, id, zIndex);
         if (this.obsSettings.LockInputs)
         {
-            base.SetSceneItemLocked(BambuScene, id, true);
+            base.SetSceneItemLocked(scene, id, true);
         }
 
         // Sleep before returning as to not overwhelm OBS :)
@@ -301,7 +307,8 @@ public class MyOBSWebsocket(
             {"linear_alpha", true },
             {"unload", true }
         };
-        var id = base.CreateInput(BambuScene, inputSettings.Name, ImageInputType, imageInput, true);
+        string scene = this.obsSettings.BambuScene;
+        var id = base.CreateInput(scene, inputSettings.Name, ImageInputType, imageInput, true);
 
         var transform = new JObject
         {
@@ -310,12 +317,12 @@ public class MyOBSWebsocket(
             { "scaleX", inputSettings.DefaultScaleFactor },
             { "scaleY", inputSettings.DefaultScaleFactor }
         };
-        base.SetSceneItemTransform(BambuScene, id, transform);
+        base.SetSceneItemTransform(scene, id, transform);
 
-        base.SetSceneItemIndex(BambuScene, id, zIndex);
+        base.SetSceneItemIndex(scene, id, zIndex);
         if (this.obsSettings.LockInputs)
         {
-            base.SetSceneItemLocked(BambuScene, id, true);
+            base.SetSceneItemLocked(scene, id, true);
         }
 
         // Sleep before returning as to not overwhelm OBS :)

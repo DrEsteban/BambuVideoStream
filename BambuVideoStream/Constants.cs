@@ -7,9 +7,6 @@ public static class Constants
 {
     public static class OBS
     {
-        public const string BambuScene = "BambuStream";
-        public const string BambuStreamSource = "BambuStreamSource";
-
         public const string TextInputType = "text_gdiplus_v2";
         public const string ImageInputType = "image_source";
         public const string ColorInputType = "color_source_v3";

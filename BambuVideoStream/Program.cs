@@ -118,31 +118,33 @@ if (!string.IsNullOrEmpty(fileLogFormat))
 }
 
 // Services
-services.Configure<BambuSettings>(configuration.GetSection(nameof(BambuSettings)));
-services.AddSingleton<IOptions<BambuSettings>>(c =>
-{
-    var settings = configuration.GetSection(nameof(BambuSettings)).Get<BambuSettings>() ?? new();
-    if (string.IsNullOrWhiteSpace(settings.PathToSDP))
+services.AddOptionsWithValidateOnStart<BambuSettings>()
+    .BindConfiguration(nameof(BambuSettings))
+    .ValidateDataAnnotations()
+    .Configure((BambuSettings settings, ILogger<Program> logger) =>
     {
-        var logger = c.GetRequiredService<ILogger<Program>>();
-        try
+        if (string.IsNullOrWhiteSpace(settings.PathToSDP))
         {
-            settings.PathToSDP = Path.GetFullPath(Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BambuStudio/cameratools/ffmpeg.sdp"));
+            try
+            {
+                settings.PathToSDP = Path.GetFullPath(Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BambuStudio/cameratools/ffmpeg.sdp"));
+            }
+            catch (PlatformNotSupportedException)
+            {
+                // Doesn't work on Mac/Linux, user must set via appsettings
+                logger.LogTrace("Platform '{platform}' does not support SpecialFolder.ApplicationData. User must set PathToSDP via appsettings.", Environment.OSVersion.Platform);
+            }
+            catch (Exception e)
+            {
+                logger.LogError(e, "Error setting default path to SDP. That's okay if you've set it via appsettings.");
+            }
         }
-        catch (PlatformNotSupportedException)
-        {
-            // Doesn't work on Mac/Linux, user must set via appsettings
-            logger.LogTrace("Platform '{platform}' does not support SpecialFolder.ApplicationData. User must set PathToSDP via appsettings.", Environment.OSVersion.Platform);
-        }
-        catch (Exception e)
-        {
-            logger.LogError(e, "Error setting default path to SDP. That's okay if you've set it via appsettings.");
-        }
-    }
-    return Options.Create(settings);
-});
-services.Configure<OBSSettings>(configuration.GetSection(nameof(OBSSettings)));
-services.Configure<AppSettings>(configuration.GetSection(nameof(AppSettings)));
+    });
+services.AddOptionsWithValidateOnStart<OBSSettings>()
+    .BindConfiguration(nameof(OBSSettings))
+    .ValidateDataAnnotations();
+services.AddOptions<AppSettings>()
+    .BindConfiguration(nameof(AppSettings));
 services.AddTransient<FtpService>();
 services.AddTransient<MyOBSWebsocket>();
 services.AddHostedService<BambuStreamBackgroundService>();
