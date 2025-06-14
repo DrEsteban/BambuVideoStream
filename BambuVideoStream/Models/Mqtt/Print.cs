@@ -10,6 +10,8 @@ namespace BambuVideoStream.Models.Mqtt;
 public class PrintMessage
 {
     public Print print { get; set; }
+
+    public bool IsStatusUpdateMessage() => print?.command == "push_status";
 }
 
 

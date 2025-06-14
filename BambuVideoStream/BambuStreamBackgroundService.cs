@@ -151,7 +151,7 @@ public class BambuStreamBackgroundService : BackgroundService
             await this.mqttClient.SubscribeAsync(this.mqttSubscribeOptions, stoppingToken);
 
             // Start processing messages
-            new Thread(async () =>
+            Task.Run(async () =>
             {
                 try
                 {
@@ -177,7 +177,7 @@ public class BambuStreamBackgroundService : BackgroundService
                     this.log.LogDebug("Reader thread stopped");
                     this.hostLifetime.StopApplication();
                 }
-            }).Start();
+            }, stoppingToken).Forget();
             stoppingToken.Register(() => this.mqttProcessingChannel.Writer.Complete());
 
             // Wait for the application to stop
@@ -386,11 +386,12 @@ public class BambuStreamBackgroundService : BackgroundService
 
                     var p = doc.Deserialize<PrintMessage>();
 
-                    if (!this.obs.IsConnected || !this.obsInitialized)
+                    if (!this.obs.IsConnected || !this.obsInitialized || !p.IsStatusUpdateMessage())
                     {
-                        this.log.LogWarning("OBS not connected or initialized");
+                        // Not a status update command, skip
                         break;
                     }
+
                     obs.UpdateText(this.chamberTemp, $"{p.print.chamber_temper} °C");
                     obs.UpdateText(this.bedTemp, $"{p.print.bed_temper}");
 
@@ -565,6 +566,7 @@ public class BambuStreamBackgroundService : BackgroundService
                         }
                     });
                 }
+
                 // Check for app shutdown conditions
                 if (p.print.current_stage == PrintStage.Idle &&
                     this.appSettings.ExitOnIdle)
