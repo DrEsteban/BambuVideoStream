@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.IO.Compression;
-using System.Threading;
+﻿using System.IO.Compression;
 using System.Xml.Linq;
 using System.Xml.XPath;
 using BambuVideoStream.Models;
@@ -10,8 +6,6 @@ using BambuVideoStream.Utilities;
 using FluentFTP;
 using FluentFTP.Exceptions;
 using FluentFTP.GnuTLS;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 
@@ -61,7 +55,7 @@ public class FtpService(
 
     /// <exception cref="FtpMissingObjectException"></exception>
     /// <exception cref="ObjectDisposedException"></exception>
-    public byte[] GetFileThumbnail(string filename)
+    public byte[]? GetFileThumbnail(string filename)
     {
         try
         {
@@ -88,12 +82,17 @@ public class FtpService(
             }
 
             this.ct.ThrowIfCancellationRequested();
-            using var entryStream = archive.GetEntry(previewFileName).Open();
+            using var entryStream = archive.GetEntry(previewFileName)!.Open();
             this.ct.ThrowIfCancellationRequested();
 
             using var outputStream = new MemoryStream();
             entryStream.CopyTo(outputStream);
             return outputStream.ToArray();
+        }
+        catch (NullReferenceException)
+        {
+            this.log.LogWarning("Couldn't find thumbnail in file '{filename}'", filename);
+            return null;
         }
         catch (FtpMissingObjectException e)
         {
@@ -108,7 +107,7 @@ public class FtpService(
 
     /// <exception cref="ObjectDisposedException"></exception>
     /// <remarks>Swallows (but logs) runtime exceptions other than <see cref="ObjectDisposedException"/></remarks>
-    public string GetPrintJobWeight(string filename)
+    public string? GetPrintJobWeight(string filename)
     {
         try
         {
@@ -131,14 +130,18 @@ public class FtpService(
             string configFileName = "Metadata/slice_info.config";
 
             this.ct.ThrowIfCancellationRequested();
-            using var reader = new StreamReader(archive.GetEntry(configFileName).Open());
+            using var reader = new StreamReader(archive.GetEntry(configFileName)!.Open());
             this.ct.ThrowIfCancellationRequested();
             string xml = reader.ReadToEnd();
 
             var doc = XDocument.Parse(xml);
             var filamentNode = doc.XPathSelectElement("//filament");
-            var weight = filamentNode.Attribute("used_g").Value;
+            var weight = filamentNode!.Attribute("used_g")!.Value;
             return weight;
+        }
+        catch (NullReferenceException)
+        {
+            this.log.LogWarning("Couldn't find weight info in file '{filename}'", filename);
         }
         catch (FtpMissingObjectException)
         {

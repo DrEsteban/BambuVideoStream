@@ -7,7 +7,7 @@ public static class Constants
 {
     public static class OBS
     {
-        public const string TextInputType = "text_gdiplus_v2";
+        public const string TextInputType = "text_gdiplus_v3";
         public const string ImageInputType = "image_source";
         public const string ColorInputType = "color_source_v3";
         public const string VideoInputType = "ffmpeg_source";
@@ -98,10 +98,16 @@ public static class Constants
         public static readonly InitialToggleIconSettings BedTempIconInitialSettings =
             new("BedTempIcon",
                 defaultPositionX: 222,
-                defaultPositionY: 10251,
+                defaultPositionY: 1025,
                 defaultScaleFactor: 1m,
                 icon_off: GetPath("monitor_bed_temp.png"),
                 icon_on: GetPath("monitor_bed_temp_active.png"));
+        public static readonly InitialIconSettings ChamberTempIconInitialSettings =
+            new("ChamberTempIcon",
+                defaultPositionX: 9,
+                defaultPositionY: 1019,
+                defaultScaleFactor: 1m,
+                icon: GetPath("monitor_frame_temp.png"));
         public static readonly InitialToggleIconSettings PartFanIconInitialSettings =
             new("PartFanIcon",
                 defaultPositionX: 10,
@@ -130,12 +136,6 @@ public static class Constants
                 defaultScaleFactor: 0.5m,
                 icon_off: GetPath("preview_placeholder.png"),
                 icon_on: GetPath("preview.png")); // Created at runtime
-        public static readonly InitialIconSettings ChamberTempIconInitialSettings =
-            new("ChamberTempIcon",
-                defaultPositionX: 9,
-                defaultPositionY: 1021,
-                defaultScaleFactor: 1m,
-                icon: GetPath("monitor_frame_temp.png"));
         public static readonly InitialIconSettings TimeIconInitialSettings =
             new("TimeIcon",
                 defaultPositionX: 1730,

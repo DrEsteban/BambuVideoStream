@@ -1,20 +1,13 @@
-﻿using System;
-using System.Collections.Concurrent;
-using System.IO;
-using System.Linq;
+﻿using System.Collections.Concurrent;
 using System.Security.Authentication;
 using System.Text;
 using System.Text.Json;
-using System.Threading;
 using System.Threading.Channels;
-using System.Threading.Tasks;
 using BambuVideoStream.Models;
 using BambuVideoStream.Models.Mqtt;
 using BambuVideoStream.Models.Wrappers;
 using BambuVideoStream.Services;
 using BambuVideoStream.Utilities;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MQTTnet;
 using MQTTnet.Client;
@@ -50,29 +43,29 @@ public class BambuStreamBackgroundService : BackgroundService
 
     private bool obsInitialized;
 
-    private InputSettings chamberTemp;
-    private InputSettings bedTemp;
-    private InputSettings targetBedTemp;
-    private InputSettings nozzleTemp;
-    private InputSettings targetNozzleTemp;
-    private InputSettings percentComplete;
-    private InputSettings layers;
-    private InputSettings timeRemaining;
-    private InputSettings subtaskName;
-    private InputSettings stage;
-    private InputSettings partFan;
-    private InputSettings auxFan;
-    private InputSettings chamberFan;
-    private InputSettings filament;
-    private InputSettings printWeight;
-    private ToggleIconInputSettings nozzleTempIcon;
-    private ToggleIconInputSettings bedTempIcon;
-    private ToggleIconInputSettings partFanIcon;
-    private ToggleIconInputSettings auxFanIcon;
-    private ToggleIconInputSettings chamberFanIcon;
-    private ToggleIconInputSettings previewImage;
+    private InputSettings? chamberTemp;
+    private InputSettings? bedTemp;
+    private InputSettings? targetBedTemp;
+    private InputSettings? nozzleTemp;
+    private InputSettings? targetNozzleTemp;
+    private InputSettings? percentComplete;
+    private InputSettings? layers;
+    private InputSettings? timeRemaining;
+    private InputSettings? subtaskName;
+    private InputSettings? stage;
+    private InputSettings? partFan;
+    private InputSettings? auxFan;
+    private InputSettings? chamberFan;
+    private InputSettings? filament;
+    private InputSettings? printWeight;
+    private ToggleIconInputSettings? nozzleTempIcon;
+    private ToggleIconInputSettings? bedTempIcon;
+    private ToggleIconInputSettings? partFanIcon;
+    private ToggleIconInputSettings? auxFanIcon;
+    private ToggleIconInputSettings? chamberFanIcon;
+    private ToggleIconInputSettings? previewImage;
 
-    private string subtask_name;
+    private string? subtask_name;
     private int lastLayerNum;
     private PrintStage? lastPrintStage;
 
@@ -143,7 +136,7 @@ public class BambuStreamBackgroundService : BackgroundService
             var connectResult = await this.mqttClient.ConnectAsync(this.mqttClientOptions, stoppingToken);
             if (connectResult?.ResultCode != MqttClientConnectResultCode.Success)
             {
-                throw new Exception($"Failed to connect to Bambu MQTT: {connectResult.ResultCode}");
+                throw new Exception($"Failed to connect to Bambu MQTT: {connectResult?.ResultCode}");
             }
 
             this.log.LogInformation("Connected to Bambu MQTT");
@@ -201,7 +194,7 @@ public class BambuStreamBackgroundService : BackgroundService
     /// <summary>
     /// Called when the OBS Websocket connects, to initialize the scene and inputs
     /// </summary>
-    private async void Obs_Connected(object sender, EventArgs e)
+    private async void Obs_Connected(object? sender, EventArgs e)
     {
         this.log.LogInformation("Connected to OBS WebSocket");
 
@@ -280,7 +273,7 @@ public class BambuStreamBackgroundService : BackgroundService
     /// <summary>
     /// Called when the OBS Websocket disconnects/fails to connect
     /// </summary>
-    private void Obs_Disconnected(object sender, ObsDisconnectionInfo e)
+    private void Obs_Disconnected(object? sender, ObsDisconnectionInfo e)
     {
         this.obsInitialized = false;
         this.log.LogWarning("OBS WebSocket disconnected: {reason} ({opcode})", e.DisconnectReason, e.ObsCloseCode);
@@ -386,7 +379,7 @@ public class BambuStreamBackgroundService : BackgroundService
 
                     var p = doc.Deserialize<PrintMessage>();
 
-                    if (!this.obs.IsConnected || !this.obsInitialized || !p.IsStatusUpdateMessage())
+                    if (!this.obs.IsConnected || !this.obsInitialized || !(p?.IsStatusUpdateMessage() ?? false))
                     {
                         // Not a status update command, skip
                         break;
@@ -458,13 +451,16 @@ public class BambuStreamBackgroundService : BackgroundService
                     if (!string.IsNullOrEmpty(p.print.subtask_name) && p.print.subtask_name != this.subtask_name)
                     {
                         this.subtask_name = p.print.subtask_name;
-                        var fileLocation = this.DetermineFileLocation(this.subtask_name);
+                        string? fileLocation = this.DetermineFileLocation(this.subtask_name);
                         if (!string.IsNullOrEmpty(fileLocation))
                         {
                             this.DownloadFileImagePreview(fileLocation);
 
                             var weight = this.ftpService.GetPrintJobWeight(fileLocation);
-                            obs.UpdateText(this.printWeight, $"{weight}g");
+                            if (!string.IsNullOrEmpty(weight))
+                            {
+                                obs.UpdateText(this.printWeight, $"{weight}g");
+                            }
                         }
                         else
                         {
@@ -495,10 +491,10 @@ public class BambuStreamBackgroundService : BackgroundService
         }
     }
 
-    private string DetermineFileLocation(string subtaskName)
+    private string? DetermineFileLocation(string subtaskName)
     {
-        var cacheFileName = $"/cache/{subtaskName.Trim()}".EnsureSuffix(".3mf"); // File was sent via BambuStudio
-        var savedFileName = $"/{subtaskName.Trim()}".EnsureSuffix(".3mf"); // File was saved to the printer
+        var cacheFileName = $"/cache/{subtaskName.Trim()}".EnsureSuffix(".gcode.3mf"); // File was sent via BambuStudio
+        var savedFileName = $"/{subtaskName.Trim()}".EnsureSuffix(".gcode.3mf"); // File was saved to the printer
         if (this.ftpService.FileExists(cacheFileName))
         {
             this.log.LogInformation("Found print file at: {cacheFileName}", cacheFileName);
@@ -521,6 +517,11 @@ public class BambuStreamBackgroundService : BackgroundService
         try
         {
             var bytes = this.ftpService.GetFileThumbnail(fileName);
+            if (bytes == null)
+            {
+                this.log.LogError("no thumbnail available");
+                return;
+            }
 
             File.WriteAllBytes(PreviewImageInitialSettings.DefaultEnabledIconPath, bytes);
             this.log.LogInformation("got image preview");

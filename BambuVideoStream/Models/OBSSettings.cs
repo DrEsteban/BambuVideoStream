@@ -5,9 +5,9 @@ namespace BambuVideoStream.Models;
 public class OBSSettings
 {
     [Required]
-    public string WsAddress { get; set; }
+    public required string WsAddress { get; set; }
 
-    public string WsPassword { get; set; }
+    public string? WsPassword { get; set; }
 
     [Required]
     public string BambuScene { get; set; } = "BambuScene";

@@ -1,11 +1,7 @@
 ﻿#if UseVelopack
 
-using System;
 using System.Diagnostics;
-using System.IO;
-using System.Threading.Tasks;
 using BambuVideoStream.Models;
-using Microsoft.Extensions.Configuration;
 using Velopack;
 using Velopack.Sources;
 

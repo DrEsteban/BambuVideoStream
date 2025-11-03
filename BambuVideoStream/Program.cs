@@ -1,16 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Reflection;
+﻿using System.Reflection;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using BambuVideoStream;
 using BambuVideoStream.Models;
 using BambuVideoStream.Services;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -30,7 +22,8 @@ await VelopackSupport.InitializeAsync(args);
         var filePath = Path.Combine(Constants.OBS.ImageDir, fileName);
         if (!File.Exists(filePath))
         {
-            using var resource = Assembly.GetExecutingAssembly().GetManifestResourceStream(image);
+            using var resource = Assembly.GetExecutingAssembly().GetManifestResourceStream(image) 
+                ?? throw new Exception($"Embedded resource '{image}' not found.");
             using var file = File.Create(filePath);
             resource.CopyTo(file);
         }
@@ -48,7 +41,7 @@ var logging = builder.Logging;
 configuration.AddJsonFile("secrets.json", optional: true);
 configuration.AddJsonFile("connection.json", optional: true);
 #if UseVelopack
-configuration.AddJsonFile(VelopackSupport.ConnectionSettingsFilePath, optional: false);
+configuration.AddJsonFile(VelopackSupport.ConnectionSettingsFilePath, optional: environment.IsDevelopment());
 #endif
 
 // Telemetry
@@ -105,7 +98,7 @@ if (useOtlpExporter)
 }
 
 // Log files
-string fileLogFormat = configuration.GetValue<string>("Logging:File:FilenameFormat");
+string? fileLogFormat = configuration.GetValue<string>("Logging:File:FilenameFormat");
 if (!string.IsNullOrEmpty(fileLogFormat))
 {
     if (!Enum.TryParse(configuration.GetValue<string>("Logging:File:MinimumLevel"), out LogLevel minLevel))

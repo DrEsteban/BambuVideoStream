@@ -1,7 +1,8 @@
-﻿using System;
-using System.Collections.Generic;
+﻿#nullable disable
+
 using System.ComponentModel;
 using System.Reflection;
+using Newtonsoft.Json;
 
 namespace BambuVideoStream.Models.Mqtt;
 
@@ -31,7 +32,9 @@ public class Print
     /// Chamber fan
     /// </summary>
     public string big_fan2_speed { get; set; }
-    public double chamber_temper { get; set; }
+    [JsonIgnore]
+    public double chamber_temper => info?.temp ?? 0;
+    public ChamberInfo info { get; set; }
     public string command { get; set; }
     public string cooling_fan_speed { get; set; }
     public string fail_reason { get; set; }
@@ -120,6 +123,11 @@ public class Print
     public SpeedLevel speed_level => (SpeedLevel)this.spd_lvl;
 
     public string speed_level_str => Enum.IsDefined(this.speed_level) ? this.speed_level.ToString() : "Undefined";
+}
+
+public class ChamberInfo
+{
+    public double temp { get; set; }
 }
 
 public enum PrintStage

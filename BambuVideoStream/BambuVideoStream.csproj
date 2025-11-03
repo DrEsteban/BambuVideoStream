@@ -3,8 +3,8 @@
     <Version>1.1</Version>
     <OutputType>Exe</OutputType>
     <TargetFramework>net9.0</TargetFramework>
-    <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
     <UserSecretsId>f76d68f2-da99-4ef8-a6ca-13e366f0334c</UserSecretsId>
     <PublishSingleFile>true</PublishSingleFile>
     <!-- This setting cannot be enabled, because the FluentFTP.GnuTLS dependency below doesn't know how
@@ -46,7 +46,7 @@
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.0" />
     <PackageReference Include="Microsoft.Extensions.Logging" Version="9.0.0" />
     <PackageReference Include="OpenTelemetry" Version="1.10.0" />
-    <PackageReference Include="OpenTelemetry.Api" Version="1.10.0" />
+    <PackageReference Include="OpenTelemetry.Api" Version="1.13.1" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.10.0" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.10.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="0.5.0-beta.7" />

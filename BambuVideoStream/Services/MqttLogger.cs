@@ -1,6 +1,4 @@
-﻿using System;
-using Microsoft.Extensions.Logging;
-using MQTTnet.Client;
+﻿using MQTTnet.Client;
 using MQTTnet.Diagnostics;
 
 namespace BambuVideoStream.Services;

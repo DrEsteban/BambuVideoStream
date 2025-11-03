@@ -5,7 +5,7 @@ namespace BambuVideoStream.Models;
 public class BambuSettings
 {
     [Required]
-    public string IpAddress { get; set; }
+    public required string IpAddress { get; set; }
 
     [Range(1, ushort.MaxValue)]
     public int MqttPort { get; set; }
@@ -14,13 +14,13 @@ public class BambuSettings
     public int FtpPort { get; set; }
 
     [Required]
-    public string Username { get; set; }
+    public required string Username { get; set; }
 
     [Required]
-    public string Password { get; set; }
+    public required string Password { get; set; }
 
     [Required]
-    public string Serial { get; set; }
+    public required string Serial { get; set; }
 
-    public string PathToSDP { get; set; }
+    public string? PathToSDP { get; set; }
 }

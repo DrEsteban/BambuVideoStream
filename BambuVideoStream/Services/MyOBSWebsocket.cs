@@ -1,11 +1,5 @@
-﻿using System;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using BambuVideoStream.Models;
+﻿using BambuVideoStream.Models;
 using BambuVideoStream.Models.Wrappers;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using OBSWebsocketDotNet;
@@ -127,7 +121,7 @@ public class MyOBSWebsocket(
             {
                 { "ffmpeg_options", FfmpegOptions },
                 { "hw_decode", true },
-                { "input", $"file:{Path.Combine(this.bambuSettings.PathToSDP)}" },
+                { "input", $"file:{Path.Combine(this.bambuSettings.PathToSDP ?? throw new Exception($"Unexpected null config: {nameof(this.bambuSettings.PathToSDP)}"))}" },
                 { "is_local_file", false },
                 { "reconnect_delay_sec", 2 }
             };
@@ -243,7 +237,7 @@ public class MyOBSWebsocket(
 
         JObject itemData = new JObject
         {
-            { "text", "test" },
+            { "text", string.Empty },
             { "font", new JObject
                 {
                     { "face", "Arial" },
@@ -345,8 +339,14 @@ public class MyOBSWebsocket(
     /// <summary>
     /// Updates the text of an existing text input source.
     /// </summary>
-    public void UpdateText(InputSettings setting, string text)
+    public void UpdateText(InputSettings? setting, string text)
     {
+        if (setting == null)
+        {
+            this.log.LogWarning("Tried to update text of a null input setting");
+            return;
+        }
+
         setting.Settings["text"] = text;
         base.SetInputSettings(setting);
     }
@@ -354,8 +354,14 @@ public class MyOBSWebsocket(
     /// <summary>
     /// Sets the icon path of an existing input source based on the state.
     /// </summary>
-    public void SetIconState(ToggleIconInputSettings settings, bool isEnabled)
+    public void SetIconState(ToggleIconInputSettings? settings, bool isEnabled)
     {
+        if (settings == null)
+        {
+            this.log.LogWarning("Tried to set icon state of a null input setting");
+            return;
+        }
+
         settings.InputSettings.Settings["file"] = isEnabled 
             ? settings.InitialToggleIconSettings.DefaultEnabledIconPath 
             : settings.InitialToggleIconSettings.DefaultIconPath;

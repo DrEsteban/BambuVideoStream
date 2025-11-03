@@ -1,4 +1,6 @@
-﻿namespace BambuVideoStream.Models.Mqtt;
+﻿#nullable disable
+
+namespace BambuVideoStream.Models.Mqtt;
 
 public class McPrintMessage
 {
