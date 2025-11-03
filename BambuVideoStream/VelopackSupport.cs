@@ -172,7 +172,9 @@ internal static class VelopackSupport
                 Console.WriteLine("NOTE: When you update, your connection settings will be preserved but application settings will be reset.");
                 Console.WriteLine();
                 Console.WriteLine("Press 'y' to update, or any other key to skip...");
-                if (Console.ReadKey().Key != ConsoleKey.Y)
+                var key = Console.ReadKey().Key;
+                Console.WriteLine();
+                if (key != ConsoleKey.Y)
                 {
                     Console.WriteLine("Update skipped.");
                 }
@@ -187,6 +189,10 @@ internal static class VelopackSupport
                     mgr.ApplyUpdatesAndRestart(newVersion, args);
                     throw new UnreachableException($"{nameof(mgr.ApplyUpdatesAndRestart)} should have exited the application!");
                 }
+            }
+            else
+            {
+                Console.WriteLine("No updates available.");
             }
         }
         catch (Exception e)
