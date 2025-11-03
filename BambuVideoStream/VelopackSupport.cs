@@ -182,7 +182,7 @@ internal static class VelopackSupport
                 {
                     Console.WriteLine("Updating...");
                     // download new version
-                    await mgr.DownloadUpdatesAsync(newVersion, progress => Console.WriteLine($"{progress}% completed", progress));
+                    await mgr.DownloadUpdatesAsync(newVersion, progress => Console.WriteLine($"{progress}% completed"));
                     Console.WriteLine("Download completed. Restarting...");
 
                     // install new version and restart app
