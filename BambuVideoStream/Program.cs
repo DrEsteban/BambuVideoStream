@@ -1,8 +1,12 @@
-﻿using System.Reflection;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Reflection;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using BambuVideoStream;
 using BambuVideoStream.Models;
 using BambuVideoStream.Services;
+using Microsoft.Extensions.Configuration.Json;
+using Microsoft.Extensions.Configuration.UserSecrets;
+using Microsoft.Extensions.FileProviders;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -22,7 +26,7 @@ await VelopackSupport.InitializeAsync(args);
         var filePath = Path.Combine(Constants.OBS.ImageDir, fileName);
         if (!File.Exists(filePath))
         {
-            using var resource = Assembly.GetExecutingAssembly().GetManifestResourceStream(image) 
+            using var resource = Assembly.GetExecutingAssembly().GetManifestResourceStream(image)
                 ?? throw new Exception($"Embedded resource '{image}' not found.");
             using var file = File.Create(filePath);
             resource.CopyTo(file);
@@ -41,7 +45,20 @@ var logging = builder.Logging;
 configuration.AddJsonFile("secrets.json", optional: true);
 configuration.AddJsonFile("connection.json", optional: true);
 #if UseVelopack
-configuration.AddJsonFile(VelopackSupport.ConnectionSettingsFilePath, optional: environment.IsDevelopment());
+{
+    string? userSecretsPath = TryGetUserSecretsPath();
+    bool velopackConnectionSettingsOptional = !string.IsNullOrEmpty(userSecretsPath)
+        && configuration.Sources
+            .OfType<JsonConfigurationSource>()
+            .Where(p => p.FileProvider != null && p.Path != null)
+            .Where(p =>
+            {
+                var file = p.FileProvider!.GetFileInfo(p.Path!);
+                return file.Exists && string.Equals(file.PhysicalPath, userSecretsPath, StringComparison.OrdinalIgnoreCase);
+            })
+            .Any();
+    configuration.AddJsonFile(VelopackSupport.ConnectionSettingsFilePath, optional: velopackConnectionSettingsOptional);
+}
 #endif
 
 // Telemetry
@@ -149,3 +166,24 @@ await host.RunAsync();
 Console.WriteLine("Press any key to exit...");
 Console.ReadKey(intercept: true);
 #endif
+
+internal partial class Program
+{
+    private static string? TryGetUserSecretsPath()
+    {
+        string? userSecretsId = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<UserSecretsIdAttribute>()?
+            .UserSecretsId;
+
+        if (string.IsNullOrWhiteSpace(userSecretsId))
+        {
+            return null;
+        }
+
+        string secretsRoot = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        string secretsDir = Path.Combine(secretsRoot, "Microsoft", "UserSecrets", userSecretsId);
+        string userSecretsFile = Path.Combine(secretsDir, "secrets.json");
+
+        return userSecretsFile;
+    }
+}

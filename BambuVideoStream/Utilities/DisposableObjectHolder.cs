@@ -11,7 +11,7 @@ internal class DisposableObjectHolder<T>(T theObject) : IDisposable
 {
     public T Value => theObject;
 
-    public event EventHandler<T> Disposing;
+    public event EventHandler<T>? Disposing;
 
     public void Dispose()
     {

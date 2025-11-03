@@ -1,4 +1,5 @@
-﻿using BambuVideoStream.Models;
+﻿using System.Diagnostics.CodeAnalysis;
+using BambuVideoStream.Models;
 using BambuVideoStream.Models.Wrappers;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
@@ -25,7 +26,7 @@ public class MyOBSWebsocket(
     /// Whether an input source with the given name exists.
     /// </summary>
     /// <param name="input">If the input exists, contains the input settings</param>
-    public bool InputExists(string sourceName, out InputSettings input)
+    public bool InputExists(string sourceName, [NotNullWhen(true)] out InputSettings? input)
     {
         try
         {
@@ -283,7 +284,7 @@ public class MyOBSWebsocket(
             }
             else
             {
-                if (input.Settings["file"].Value<string>() != inputSettings.DefaultIconPath)
+                if (input.Settings["file"]?.Value<string>() != inputSettings.DefaultIconPath)
                 {
                     input.Settings["file"] = inputSettings.DefaultIconPath;
                     base.SetInputSettings(input);
@@ -362,8 +363,8 @@ public class MyOBSWebsocket(
             return;
         }
 
-        settings.InputSettings.Settings["file"] = isEnabled 
-            ? settings.InitialToggleIconSettings.DefaultEnabledIconPath 
+        settings.InputSettings.Settings["file"] = isEnabled
+            ? settings.InitialToggleIconSettings.DefaultEnabledIconPath
             : settings.InitialToggleIconSettings.DefaultIconPath;
         base.SetInputSettings(settings.InputSettings);
     }
