@@ -1,17 +1,17 @@
-﻿using System.Diagnostics.CodeAnalysis;
-using System.Reflection;
+﻿using System.Reflection;
 using Azure.Monitor.OpenTelemetry.Exporter;
 using BambuVideoStream;
 using BambuVideoStream.Models;
 using BambuVideoStream.Services;
 using Microsoft.Extensions.Configuration.Json;
 using Microsoft.Extensions.Configuration.UserSecrets;
-using Microsoft.Extensions.FileProviders;
 using OpenTelemetry;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 
+bool useVeloPack = false;
 #if UseVelopack
+useVeloPack = true;
 await VelopackSupport.InitializeAsync(args);
 #endif
 
@@ -34,141 +34,177 @@ await VelopackSupport.InitializeAsync(args);
     }
 }
 
-// Build the host
-var builder = new HostApplicationBuilder(args);
-var services = builder.Services;
-var configuration = builder.Configuration;
-var environment = builder.Environment;
-var logging = builder.Logging;
+bool exit = false;
+while (useVeloPack && !exit)
+{
+    try
+    {
+        // Build the host
+        var builder = GetHostBuilder(args);
 
-// Config files with connection settings and user secrets
-configuration.AddJsonFile("secrets.json", optional: true);
-configuration.AddJsonFile("connection.json", optional: true);
-#if UseVelopack
-{
-    string? userSecretsPath = TryGetUserSecretsPath();
-    bool velopackConnectionSettingsOptional = !string.IsNullOrEmpty(userSecretsPath)
-        && configuration.Sources
-            .OfType<JsonConfigurationSource>()
-            .Where(p => p.FileProvider != null && p.Path != null)
-            .Where(p =>
-            {
-                var file = p.FileProvider!.GetFileInfo(p.Path!);
-                return file.Exists && string.Equals(file.PhysicalPath, userSecretsPath, StringComparison.OrdinalIgnoreCase);
-            })
-            .Any();
-    configuration.AddJsonFile(VelopackSupport.ConnectionSettingsFilePath, optional: velopackConnectionSettingsOptional);
-}
-#endif
-
-// Telemetry
-services.AddMetrics();
-bool useAzureMonitor = !string.IsNullOrWhiteSpace(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]);
-bool useOtlpExporter = !string.IsNullOrWhiteSpace(configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
-logging.AddOpenTelemetry(o =>
-{
-    o.ParseStateValues =
-        o.IncludeFormattedMessage =
-        o.IncludeScopes = true;
-});
-var otel = services.AddOpenTelemetry()
-    .ConfigureResource(r =>
-    {
-        _ = r.AddService(
-                environment.ApplicationName,
-                serviceNamespace: "DrEsteban",
-                serviceVersion: Assembly.GetExecutingAssembly().GetName().Version?.ToString())
-            .AddAttributes([KeyValuePair.Create<string, object>("DOTNET_ENVIRONMENT", environment.EnvironmentName)])
-            .AddEnvironmentVariableDetector()
-            .AddHostDetector()
-            .AddProcessDetector()
-            .AddProcessRuntimeDetector()
-            .AddOperatingSystemDetector()
-            .AddTelemetrySdk();
-    })
-    .WithLogging(l =>
-    {
-        if (useAzureMonitor)
-        {
-            l.AddAzureMonitorLogExporter();
-        }
-    })
-    .WithTracing(t =>
-    {
-        if (useAzureMonitor)
-        {
-            t.AddAzureMonitorTraceExporter();
-        }
-    })
-    .WithMetrics(m =>
-    {
-        m.AddRuntimeInstrumentation()
-            .AddProcessInstrumentation();
-        if (useAzureMonitor)
-        {
-            m.AddAzureMonitorMetricExporter();
-        }
-    });
-if (useOtlpExporter)
-{
-    otel.UseOtlpExporter();
-}
-
-// Log files
-string? fileLogFormat = configuration.GetValue<string>("Logging:File:FilenameFormat");
-if (!string.IsNullOrEmpty(fileLogFormat))
-{
-    if (!Enum.TryParse(configuration.GetValue<string>("Logging:File:MinimumLevel"), out LogLevel minLevel))
-    {
-        minLevel = LogLevel.Information;
+        // Build and run
+        using var host = builder.Build();
+        await host.RunAsync();
     }
-    builder.Logging.AddFile(fileLogFormat, minimumLevel: minLevel, isJson: false);
-    builder.Logging.AddFile(Path.ChangeExtension(fileLogFormat, ".json"), minimumLevel: minLevel, isJson: true);
-}
-
-// Services
-services.AddOptionsWithValidateOnStart<BambuSettings>()
-    .BindConfiguration(nameof(BambuSettings))
-    .ValidateDataAnnotations()
-    .Configure((BambuSettings settings, ILogger<Program> logger) =>
+    catch (Exception e)
     {
-        if (string.IsNullOrWhiteSpace(settings.PathToSDP))
+        Console.Error.WriteLine("Fatal error: " + e);
+    }
+    finally
+    {
+        if (useVeloPack && !exit)
         {
-            try
+            ConsoleCancelEventHandler cancelHandler = (sender, e) =>
             {
-                settings.PathToSDP = Path.GetFullPath(Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BambuStudio/cameratools/ffmpeg.sdp"));
-            }
-            catch (PlatformNotSupportedException)
+                Console.WriteLine("Exiting...");
+                Environment.Exit(0);
+            };
+
+            Console.CancelKeyPress += cancelHandler;
+            Console.WriteLine("Press any key to restart, or 'q' to exit...");
+            exit = Console.ReadKey(intercept: true) switch
             {
-                // Doesn't work on Mac/Linux, user must set via appsettings
-                logger.LogTrace("Platform '{platform}' does not support SpecialFolder.ApplicationData. User must set PathToSDP via appsettings.", Environment.OSVersion.Platform);
-            }
-            catch (Exception e)
-            {
-                logger.LogError(e, "Error setting default path to SDP. That's okay if you've set it via appsettings.");
-            }
+                var k when k.Key == ConsoleKey.Q => true,
+                var k when k.Modifiers.HasFlag(ConsoleModifiers.Control) && k.Key == ConsoleKey.C => true,
+                _ => exit,
+            };
+            Console.CancelKeyPress -= cancelHandler;
+
+            Console.WriteLine();
         }
-    });
-services.AddOptionsWithValidateOnStart<OBSSettings>()
-    .BindConfiguration(nameof(OBSSettings))
-    .ValidateDataAnnotations();
-services.AddOptions<AppSettings>()
-    .BindConfiguration(nameof(AppSettings));
-services.AddTransient<FtpService>();
-services.AddTransient<MyOBSWebsocket>();
-services.AddHostedService<BambuStreamBackgroundService>();
-
-// Build and run
-using var host = builder.Build();
-await host.RunAsync();
-
-#if UseVelopack
-Console.WriteLine("Press any key to exit...");
-Console.ReadKey(intercept: true);
-#endif
+    }
+}
 
 internal partial class Program
 {
+    private static HostApplicationBuilder GetHostBuilder(string[] args)
+    {
+        var builder = new HostApplicationBuilder(args);
+        var services = builder.Services;
+        var configuration = builder.Configuration;
+        var environment = builder.Environment;
+        var logging = builder.Logging;
+
+        // Config files with connection settings and user secrets
+        configuration.AddJsonFile("secrets.json", optional: false);
+        configuration.AddJsonFile("connection.json", optional: true);
+#if UseVelopack
+        {
+            string? userSecretsPath = TryGetUserSecretsPath();
+            bool velopackConnectionSettingsOptional = !string.IsNullOrEmpty(userSecretsPath)
+                && configuration.Sources
+                    .OfType<JsonConfigurationSource>()
+                    .Where(p => p.FileProvider != null && p.Path != null)
+                    .Where(p =>
+                    {
+                        var file = p.FileProvider!.GetFileInfo(p.Path!);
+                        return file.Exists && string.Equals(file.PhysicalPath, userSecretsPath, StringComparison.OrdinalIgnoreCase);
+                    })
+                    .Any();
+            configuration.AddJsonFile(VelopackSupport.ConnectionSettingsFilePath, optional: velopackConnectionSettingsOptional);
+        }
+#endif
+
+        // Telemetry
+        services.AddMetrics();
+        bool useAzureMonitor = !string.IsNullOrWhiteSpace(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]);
+        bool useOtlpExporter = !string.IsNullOrWhiteSpace(configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+        logging.AddOpenTelemetry(o =>
+        {
+            o.ParseStateValues =
+                o.IncludeFormattedMessage =
+                o.IncludeScopes = true;
+        });
+        var otel = services.AddOpenTelemetry()
+            .ConfigureResource(r =>
+            {
+                _ = r.AddService(
+                        environment.ApplicationName,
+                        serviceNamespace: "DrEsteban",
+                        serviceVersion: Assembly.GetExecutingAssembly().GetName().Version?.ToString())
+                    .AddAttributes([KeyValuePair.Create<string, object>("DOTNET_ENVIRONMENT", environment.EnvironmentName)])
+                    .AddEnvironmentVariableDetector()
+                    .AddHostDetector()
+                    .AddProcessDetector()
+                    .AddProcessRuntimeDetector()
+                    .AddOperatingSystemDetector()
+                    .AddTelemetrySdk();
+            })
+            .WithLogging(l =>
+            {
+                if (useAzureMonitor)
+                {
+                    l.AddAzureMonitorLogExporter();
+                }
+            })
+            .WithTracing(t =>
+            {
+                if (useAzureMonitor)
+                {
+                    t.AddAzureMonitorTraceExporter();
+                }
+            })
+            .WithMetrics(m =>
+            {
+                m.AddRuntimeInstrumentation()
+                    .AddProcessInstrumentation();
+                if (useAzureMonitor)
+                {
+                    m.AddAzureMonitorMetricExporter();
+                }
+            });
+        if (useOtlpExporter)
+        {
+            otel.UseOtlpExporter();
+        }
+
+        // Log files
+        string? fileLogFormat = configuration.GetValue<string>("Logging:File:FilenameFormat");
+        if (!string.IsNullOrEmpty(fileLogFormat))
+        {
+            if (!Enum.TryParse(configuration.GetValue<string>("Logging:File:MinimumLevel"), out LogLevel minLevel))
+            {
+                minLevel = LogLevel.Information;
+            }
+            builder.Logging.AddFile(fileLogFormat, minimumLevel: minLevel, isJson: false);
+            builder.Logging.AddFile(Path.ChangeExtension(fileLogFormat, ".json"), minimumLevel: minLevel, isJson: true);
+        }
+
+        // Services
+        services.AddOptionsWithValidateOnStart<BambuSettings>()
+            .BindConfiguration(nameof(BambuSettings))
+            .ValidateDataAnnotations()
+            .Configure((BambuSettings settings, ILogger<Program> logger) =>
+            {
+                if (string.IsNullOrWhiteSpace(settings.PathToSDP))
+                {
+                    try
+                    {
+                        settings.PathToSDP = Path.GetFullPath(Path.Join(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "BambuStudio/cameratools/ffmpeg.sdp"));
+                    }
+                    catch (PlatformNotSupportedException)
+                    {
+                        // Doesn't work on Mac/Linux, user must set via appsettings
+                        logger.LogTrace("Platform '{platform}' does not support SpecialFolder.ApplicationData. User must set PathToSDP via appsettings.", Environment.OSVersion.Platform);
+                    }
+                    catch (Exception e)
+                    {
+                        logger.LogError(e, "Error setting default path to SDP. That's okay if you've set it via appsettings.");
+                    }
+                }
+            });
+        services.AddOptionsWithValidateOnStart<OBSSettings>()
+            .BindConfiguration(nameof(OBSSettings))
+            .ValidateDataAnnotations();
+        services.AddOptions<AppSettings>()
+            .BindConfiguration(nameof(AppSettings));
+        services.AddTransient<FtpService>();
+        services.AddTransient<MyOBSWebsocket>();
+        services.AddHostedService<BambuStreamBackgroundService>();
+
+        return builder;
+    }
+
     private static string? TryGetUserSecretsPath()
     {
         string? userSecretsId = Assembly.GetExecutingAssembly()
